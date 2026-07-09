@@ -191,7 +191,7 @@ ESLint should complete without errors.
 Run the test suite:
 
 ```bash
-npm test
+npm run test
 ```
 
 Expected result:
@@ -347,7 +347,7 @@ Current CI checks:
 npm ci
 npm run format:check
 npm run lint
-npm test
+npm run test
 npm run build
 ```
 

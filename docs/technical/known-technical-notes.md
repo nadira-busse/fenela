@@ -344,7 +344,7 @@ Recommended validation before publication:
 ```bash
 npm run format:check
 npm run lint
-npm test
+npm run test
 npm run build
 ```
 
@@ -374,7 +374,7 @@ Latest validated result during public-readiness cleanup:
 ```text
 npm run format:check passed
 npm run lint passed
-npm test passed — 33 tests
+npm run test passed — 33 tests
 npm run build passed
 py scripts/check_internal_links.py passed
 ```
@@ -395,7 +395,7 @@ Current CI checks:
 npm ci
 npm run format:check
 npm run lint
-npm test
+npm run test
 npm run build
 ```
 
@@ -410,7 +410,7 @@ Result:
 - The audit count was reduced from 10 vulnerabilities to 2 moderate vulnerabilities.
 - `next` and `eslint-config-next` were updated to 16.2.9.
 - `npm run lint` passes.
-- `npm test` passes.
+- `npm run test` passes.
 - `npm run build` passes.
 - `npm run format:check` passes.
 - Internal Markdown links resolve.
@@ -443,7 +443,7 @@ Verified commands:
 npm ci
 npm run format:check
 npm run lint
-npm test
+npm run test
 npm run build
 python3 scripts/check_internal_links.py
 ```
@@ -454,7 +454,7 @@ Equivalent Windows checks also passed with:
 npm ci
 npm run format:check
 npm run lint
-npm test
+npm run test
 npm run build
 py scripts/check_internal_links.py
 ```
