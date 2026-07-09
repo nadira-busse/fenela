@@ -53,9 +53,6 @@ type ReminderActionStatus = "idle" | "saving" | "saved" | "error";
 type ReminderScreening = {
   startTime?: string;
   dailyReminder?: DailyReminderPreference | boolean;
-  dailyReminders?: boolean;
-  remindersEnabled?: boolean;
-  notificationsEnabled?: boolean;
 };
 
 const DAILY_REMINDER_TIME_KEY = "fenela:dailyReminder:startTime";
@@ -71,23 +68,11 @@ function getStoredDailyReminderTime(screening: ReminderScreening | null): string
 }
 
 function screeningHasExplicitReminderOptOut(screening: ReminderScreening | null): boolean {
-  return (
-    screening?.dailyReminders === false ||
-    screening?.dailyReminder === false ||
-    screening?.dailyReminder === "NOT_NOW" ||
-    screening?.remindersEnabled === false ||
-    screening?.notificationsEnabled === false
-  );
+  return screening?.dailyReminder === false || screening?.dailyReminder === "NOT_NOW";
 }
 
 function screeningHasExplicitReminderOptIn(screening: ReminderScreening | null): boolean {
-  return (
-    screening?.dailyReminders === true ||
-    screening?.dailyReminder === true ||
-    screening?.dailyReminder === "YES" ||
-    screening?.remindersEnabled === true ||
-    screening?.notificationsEnabled === true
-  );
+  return screening?.dailyReminder === true || screening?.dailyReminder === "YES";
 }
 
 function hasStoredOrScreeningReminderTime(screening: ReminderScreening | null): boolean {

@@ -1,10 +1,10 @@
-﻿# MVP Scope
+# MVP Scope
 
 This document defines the MVP boundary for Fenéla.
 
 Fenéla is a small accountability app for moments when everything feels too much. The MVP exists to support one loop:
 
-```text id="ctdlul"
+```text
 overwhelm -> one small action -> gentle accountability -> daily return
 ```
 
@@ -175,7 +175,7 @@ These would change the nature of Fenéla.
 
 Each new feature should pass this check:
 
-```text id="haf3xw"
+```text
 Does this help the user move from overwhelm to one small action and return to it later?
 ```
 

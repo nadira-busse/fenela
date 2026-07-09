@@ -26,32 +26,39 @@
 // tone, energyPattern, choiceLoad or rescreenPermission.
 // These values are read safely and normalized into the current MVP shape.
 
-export type AnchorChoiceHelp = "I_DECIDE" | "SUGGEST_ANCHORS";
+// Shared screening/guidance vocabulary lives in one place and is re-exported
+// here so existing imports from "@/lib/screeningStorage" keep working.
+export type {
+  AnchorChoiceHelp,
+  DailyReminderPreference,
+  ResistancePattern,
+  MainChallenge,
+  ActionTrigger,
+  AntiHelp,
+  ProductTone,
+  CopyLength,
+  ChoiceStyle,
+  PressureLimit,
+  RepetitionLimit,
+  ActionStyle,
+  GuidanceProfile,
+} from "@/types/screening";
 
-export type DailyReminderPreference = "YES" | "NOT_NOW";
-
-export type ResistancePattern = "DELAY" | "FORCE" | "QUIT" | "SWITCH";
-export type MainChallenge = "START" | "SUSTAIN" | "BOUNDARIES";
-export type ActionTrigger = "SMALL" | "WHY" | "REMINDER";
-export type AntiHelp = "PRESSURE" | "LONG_TEXT" | "REPETITION";
-
-export type ProductTone = "WARM_CARING_KIND";
-
-export type CopyLength = "SHORT" | "MEDIUM";
-export type ChoiceStyle = "USER_DECIDES" | "ANCHOR_SUGGESTS";
-export type PressureLimit = "LOW" | "NORMAL";
-export type RepetitionLimit = "LOW" | "NORMAL";
-export type ActionStyle = "SMALL_STEP" | "WHY_FIRST" | "REMINDER_FIRST";
-
-export type GuidanceProfile = {
-  copyLength: CopyLength;
-  tone: ProductTone;
-  choiceStyle: ChoiceStyle;
-  pressureLimit: PressureLimit;
-  repetitionLimit: RepetitionLimit;
-  actionStyle: ActionStyle;
-  dailyReminder: DailyReminderPreference;
-};
+import type {
+  AnchorChoiceHelp,
+  DailyReminderPreference,
+  ResistancePattern,
+  MainChallenge,
+  ActionTrigger,
+  AntiHelp,
+  ProductTone,
+  CopyLength,
+  ChoiceStyle,
+  PressureLimit,
+  RepetitionLimit,
+  ActionStyle,
+  GuidanceProfile,
+} from "@/types/screening";
 
 export type ScreeningV1 = {
   version: 1;

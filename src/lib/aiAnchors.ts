@@ -1,32 +1,31 @@
 import { hasUnsafeIntent } from "./safety";
+import type {
+  AnchorChoiceHelp,
+  DailyReminderPreference,
+  ResistancePattern,
+  MainChallenge,
+  ActionTrigger,
+  AntiHelp,
+  GuidanceProfile as StoredGuidanceProfile,
+} from "@/types/screening";
 
-export type AnchorChoiceHelp = "I_DECIDE" | "SUGGEST_ANCHORS";
-export type CopyLength = "SHORT" | "MEDIUM";
-export type ProductTone = "WARM_CARING_KIND";
-export type ChoiceStyle = "USER_DECIDES" | "ANCHOR_SUGGESTS";
-export type PressureLimit = "LOW" | "NORMAL";
-export type RepetitionLimit = "LOW" | "NORMAL";
-export type ActionStyle = "SMALL_STEP" | "WHY_FIRST" | "REMINDER_FIRST";
-export type DailyReminderPreference = "YES" | "NOT_NOW";
-
-export type ResistancePattern = "DELAY" | "FORCE" | "QUIT" | "SWITCH";
-export type MainChallenge = "START" | "SUSTAIN" | "BOUNDARIES";
-export type ActionTrigger = "SMALL" | "WHY" | "REMINDER";
-export type AntiHelp = "PRESSURE" | "LONG_TEXT" | "REPETITION";
+export type {
+  AnchorChoiceHelp,
+  DailyReminderPreference,
+  ResistancePattern,
+  MainChallenge,
+  ActionTrigger,
+  AntiHelp,
+} from "@/types/screening";
 
 export type AnchorItem = {
   text: string;
 };
 
-export type GuidanceProfile = {
-  copyLength?: CopyLength;
-  tone?: ProductTone;
-  choiceStyle?: ChoiceStyle;
-  pressureLimit?: PressureLimit;
-  repetitionLimit?: RepetitionLimit;
-  actionStyle?: ActionStyle;
-  dailyReminder?: DailyReminderPreference;
-};
+// The AI route works with a partially-filled guidance profile (not every
+// field is known yet), while the stored screening always has all fields
+// set. Both share the same underlying shape from "@/types/screening".
+export type GuidanceProfile = Partial<StoredGuidanceProfile>;
 
 export type PersonalAnchorInterpretation = {
   directionLine: string;

@@ -280,6 +280,7 @@ When connecting a new Upstash/Vercel KV database through an integration, the gen
 - [Known limitations](docs/product/known-limitations.md)
 - [Local setup](docs/technical/local-setup.md)
 - [Known technical notes](docs/technical/known-technical-notes.md)
+- [UX review](docs/ux/ux-review.md)
 - [Architecture overview](architecture/architecture-overview.md)
 
 ## Public repository status
