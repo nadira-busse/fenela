@@ -1,4 +1,4 @@
-﻿# AI and Ethical Use Guardrails
+# AI and Ethical Use Guardrails
 
 Fenéla uses AI only for bounded anchor suggestions.
 

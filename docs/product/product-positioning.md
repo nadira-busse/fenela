@@ -1,4 +1,4 @@
-﻿# Product Positioning
+# Product Positioning
 
 Fenéla is a small accountability app for moments when everything feels too much.
 

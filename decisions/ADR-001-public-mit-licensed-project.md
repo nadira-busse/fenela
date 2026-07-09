@@ -1,4 +1,4 @@
-﻿# ADR-001: Public MIT-Licensed Project
+# ADR-001: Public MIT-Licensed Project
 
 ## Status
 

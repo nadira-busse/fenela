@@ -1,4 +1,4 @@
-﻿# ADR-003: Optional Reminders
+# ADR-003: Optional Reminders
 
 ## Status
 

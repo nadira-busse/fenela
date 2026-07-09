@@ -1,4 +1,4 @@
-﻿# Known Technical Notes
+# Known Technical Notes
 
 This document records technical notes that are relevant for running, testing and reviewing Fenéla.
 

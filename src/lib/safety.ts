@@ -1,4 +1,4 @@
-﻿// src/lib/safety.ts
+// src/lib/safety.ts
 
 export type SafetyIssueCode = "LOW_QUALITY_INPUT" | "UNSAFE_INTENT";
 

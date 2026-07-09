@@ -1,4 +1,4 @@
-﻿// src/lib/ailogic.ts
+// src/lib/ailogic.ts
 
 import type { ScreeningV1 } from "@/lib/screeningStorage";
 import { hasUnsafeIntent } from "@/lib/safety";

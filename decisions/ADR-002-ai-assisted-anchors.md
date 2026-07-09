@@ -1,4 +1,4 @@
-﻿# ADR-002: Optional AI-Assisted Anchors
+# ADR-002: Optional AI-Assisted Anchors
 
 ## Status
 

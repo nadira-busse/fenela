@@ -1,4 +1,4 @@
-﻿// src/lib/screeningStorage.ts
+// src/lib/screeningStorage.ts
 
 // Screening MVP:
 // The active screening now stores 7 product-relevant choices:

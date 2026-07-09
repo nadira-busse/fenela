@@ -1,4 +1,4 @@
-﻿# Known Limitations
+# Known Limitations
 
 Fenéla MVP1 is a small public MIT-licensed accountability app. Some limitations are intentional to keep the product simple and maintainable.
 

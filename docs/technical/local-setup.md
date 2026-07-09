@@ -1,4 +1,4 @@
-﻿# Local Setup
+# Local Setup
 
 This document explains how to run Fenéla locally.
 

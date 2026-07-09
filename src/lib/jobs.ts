@@ -1,4 +1,4 @@
-﻿// src/lib/jobs.ts
+// src/lib/jobs.ts
 import { randomUUID } from "crypto";
 import { getKvClient } from "@/lib/kv";
 

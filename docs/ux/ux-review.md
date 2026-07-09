@@ -1,4 +1,4 @@
-﻿# UX Review
+# UX Review
 
 This document reviews Fenéla from the user's perspective.
 

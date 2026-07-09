@@ -1,4 +1,4 @@
-﻿// src/lib/pushClient.ts
+// src/lib/pushClient.ts
 
 import { getOrCreateDeviceId } from "@/lib/device";
 

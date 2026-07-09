@@ -1,4 +1,4 @@
-﻿# Architecture Overview
+# Architecture Overview
 
 Fenéla is a small Next.js application built around one product loop:
 

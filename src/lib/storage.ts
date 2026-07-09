@@ -1,4 +1,4 @@
-﻿import { assertSafeAnchorList } from "./safety";
+import { assertSafeAnchorList } from "./safety";
 
 // ---------- Generic helpers ----------
 
