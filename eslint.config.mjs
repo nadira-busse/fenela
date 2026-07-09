@@ -13,6 +13,16 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // These two screens deliberately read localStorage in a useEffect and
+    // set state post-mount, to avoid a server/client hydration mismatch
+    // (localStorage isn't available during SSR). react-hooks/set-state-in-effect
+    // flags that pattern; it's intentional here, not an oversight.
+    files: ["src/app/components/CoachingScreen.tsx", "src/app/components/IntakeScreen.tsx"],
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -380,6 +380,10 @@ export default function CoachingScreen({
     const stored = loadDayState<TaskHistoryItem>();
 
     if (stored && stored.dayKey === todayKey) {
+      // Intentional: localStorage is only readable after mount, so this state
+      // is deliberately set post-hydration (not derivable during render)
+      // to avoid a server/client hydration mismatch.
+
       setActiveTasks(stored.activeTasks || []);
       setParkedTasks(stored.parkedTasks || []);
       setTaskHistory(stored.taskHistory || []);
@@ -428,6 +432,9 @@ export default function CoachingScreen({
     if (!hydrated) return;
 
     if (stateNeedsActiveTask(state) && !currentTask) {
+      // Intentional: this transitions the coach state once the active task
+      // list is empty, after the post-mount hydration above has completed.
+
       setNowReminderJobId(null);
       setState("DONE");
     }

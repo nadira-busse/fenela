@@ -199,6 +199,10 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
   useEffect(() => {
     const storedScreening = loadScreening();
+    // Intentional: localStorage is only readable after mount, so screening
+    // state is deliberately set post-hydration (not derivable during render)
+    // to avoid a server/client hydration mismatch.
+
     setScreening(storedScreening);
 
     if (storedScreening?.name) {
@@ -388,6 +392,10 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
       didGenerateRef.current = true;
       return;
     }
+
+    // Intentional: kicks off the async AI-generation call (which itself sets
+    // a loading flag) once this step becomes active; not derivable during
+    // render since it triggers a network request.
 
     runAIGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
