@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOptionalKvClient } from "@/lib/kv";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -79,6 +80,30 @@ export async function POST(req: Request) {
     }
 
     if (deviceId) {
+      // Per-device limit catches accidental repeat calls from the same
+      // real device. Per-IP limit matters more here: deviceId is
+      // client-supplied, so the natural way to bulk-register junk
+      // subscriptions is a fresh deviceId per request, which a per-device
+      // limit alone would never catch.
+      const deviceAllowed = await checkRateLimit({
+        key: `rate:push-subscribe:device:${deviceId}`,
+        limit: 10,
+        windowSeconds: 60 * 60,
+      });
+
+      const ipAllowed = await checkRateLimit({
+        key: `rate:push-subscribe:ip:${getClientIp(req)}`,
+        limit: 20,
+        windowSeconds: 60 * 60,
+      });
+
+      if (!deviceAllowed || !ipAllowed) {
+        return NextResponse.json(
+          { ok: false, remindersEnabled: false, error: "Too many subscription attempts." },
+          { status: 429 }
+        );
+      }
+
       await kv.set(subKeyForDevice(deviceId), sub);
       await kv.sadd(DEVICES_SET_KEY, deviceId);
       return NextResponse.json({ ok: true, deviceId });

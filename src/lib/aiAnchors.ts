@@ -36,6 +36,7 @@ export type PersonalAnchorInterpretation = {
 
 export type AnchorsRequest = {
   mode: AnchorChoiceHelp;
+  deviceId?: string;
   intake: {
     name?: string;
     goal: string;

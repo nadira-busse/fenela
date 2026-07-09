@@ -8,6 +8,7 @@ import { CareAnchor } from "@/types/CareAnchor";
 import { PersonalAnchorInterpretation } from "@/types/intake";
 import { makeId } from "@/lib/id";
 import { AnchorChoiceHelp, loadScreening, ScreeningV1 } from "@/lib/screeningStorage";
+import { getOrCreateDeviceId } from "@/lib/device";
 
 /** CONFIG */
 const MIN_ANCHORS = 1;
@@ -123,6 +124,7 @@ function buildLocalFallbackInterpretation(input: {
 // --- AI CLIENT ---
 async function generateAnchorsClient(payload: {
   mode: AnchorChoiceHelp;
+  deviceId?: string;
   intake: { name: string; goal: string; struggle: string; goalWhy: string };
   screening?: ScreeningV1 | null;
 }): Promise<AnchorGenerationResult> {
@@ -343,6 +345,7 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
       const generated = await generateAnchorsClient({
         mode,
+        deviceId: typeof window !== "undefined" ? getOrCreateDeviceId() : undefined,
         intake: {
           name: userName,
           goal: goal.trim(),

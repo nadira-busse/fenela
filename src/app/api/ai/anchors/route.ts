@@ -16,6 +16,7 @@ import {
   type AnchorsRequest,
 } from "@/lib/aiAnchors";
 import { validateSafeAnchorList, validateSafeUserText } from "@/lib/safety";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -54,6 +55,7 @@ function validateRequestBody(body: unknown): AnchorsRequest | null {
 
   return {
     mode: candidate.mode,
+    deviceId: hasText(candidate.deviceId) ? candidate.deviceId : undefined,
     intake: {
       name: hasText(candidate.intake.name) ? candidate.intake.name : undefined,
       goal: candidate.intake.goal,
@@ -205,6 +207,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(buildFallbackResponse(body, count));
+  }
+
+  // Only the OpenAI-cost path is rate-limited; the deterministic path above
+  // (count === 0) never reaches here. Missing deviceId falls into a shared
+  // "unknown" bucket rather than bypassing the limit entirely.
+  const allowed = await checkRateLimit({
+    key: `rate:ai-anchors:${body.deviceId ?? "unknown"}`,
+    limit: 5,
+    windowSeconds: 60 * 60,
+  });
+
+  if (!allowed) {
     return NextResponse.json(buildFallbackResponse(body, count));
   }
 

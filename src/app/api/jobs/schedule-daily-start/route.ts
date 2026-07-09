@@ -4,6 +4,7 @@ import type { PushSubscription } from "web-push";
 
 import { DEVICES_SET_KEY, makeJob, storeJobForDevice, removeJobForDevice } from "@/lib/jobs";
 import { REMINDER_TIME_ZONE, parseHHMM, nextAmsterdamOccurrenceMs } from "@/lib/timezone";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,24 @@ export async function POST(req: Request) {
             "No push subscription found for this device. Subscribe before scheduling daily reminders.",
         },
         { status: 409 }
+      );
+    }
+
+    // Requiring an existing subscription (above) already bounds most abuse
+    // here, since push/subscribe has its own per-device + per-IP limit.
+    // This adds a per-device limit on top for the same reason as the other
+    // routes: consistency, and protection against a legitimate device
+    // re-scheduling in a tight loop (e.g. a UI bug retrying repeatedly).
+    const allowed = await checkRateLimit({
+      key: `rate:schedule-daily-start:device:${deviceId}`,
+      limit: 20,
+      windowSeconds: 60 * 60,
+    });
+
+    if (!allowed) {
+      return NextResponse.json(
+        { ok: false, remindersEnabled: false, error: "Too many reminder requests." },
+        { status: 429 }
       );
     }
 
