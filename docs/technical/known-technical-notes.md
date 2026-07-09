@@ -231,6 +231,57 @@ The app does not provide:
 
 The deterministic app flow remains leading. AI is used only after basic validation and safety checks.
 
+## Rate limiting
+
+`/api/ai/anchors`, `/api/push/subscribe`, `/api/jobs/schedule-reminder` and `/api/jobs/schedule-daily-start` are publicly callable routes with no login. `/api/ai/anchors` uses OpenAI credits on Fenéla's own account per call; the other three write to KV storage on every call. Without a limit, a single device or script could drive unbounded OpenAI cost or unbounded KV growth.
+
+The rate limiter lives in:
+
+```text
+src/lib/rateLimit.ts
+```
+
+It reuses the existing KV store (no new dependency): a fixed-window counter per key, incremented on each request, with a TTL set on the first increment of that window. Limits are tuned to allow normal use while bounding cost and storage growth; exact thresholds are intentionally not documented here.
+
+Behavior when a limit is reached:
+
+```text
+/api/ai/anchors returns HTTP 200 with the existing deterministic/fallback
+response shape, so the frontend needs no special handling and the user
+sees Fenéla fall back to anchors without AI, not an error.
+
+The push and job routes return HTTP 429, which the existing client code
+already treats as a soft failure (reminders stay optional; nothing crashes).
+```
+
+Known limitation:
+
+```text
+This mitigates unintentional repeated use and low-effort abuse. It is not
+authentication and should not be treated as a hard guarantee against a
+deliberate, determined actor.
+
+The actual backstop against runaway OpenAI cost is an account-level
+spending cap set in the OpenAI dashboard, outside this repository.
+```
+
+Reason:
+
+```text
+Fail-open by design: if KV is not configured, or the rate-limit check
+itself errors, the request is allowed through. A rate limiter should not
+become the reason a core flow breaks.
+```
+
+Status:
+
+```text
+Classification: MVP safety/cost guardrail
+MVP blocker: no
+Repository action: implemented in src/lib/rateLimit.ts, tested in
+src/lib/rateLimit.test.ts, documented here
+```
+
 ## AI and ethical-use guardrails
 
 Fenéla includes basic validation and safety checks for AI-assisted and manually edited anchors.
@@ -374,7 +425,7 @@ Latest validated result during public-readiness cleanup:
 ```text
 npm run format:check passed
 npm run lint passed
-npm run test passed — 33 tests
+npm run test passed — 38 tests
 npm run build passed
 py scripts/check_internal_links.py passed
 ```
@@ -472,7 +523,7 @@ They document technical context that is useful for reviewers and maintainers:
 - cross-device runtime validation;
 - deployment limitations;
 - upstream dependency warnings;
-- safety and guardrail boundaries;
+- safety, guardrail and rate-limiting boundaries;
 - known browser/PWA testing limitations;
 - dependency audit status;
 - CI validation;

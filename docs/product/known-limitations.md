@@ -52,6 +52,14 @@ Fenéla MVP1 does not include login or account sync. Screening answers, anchor p
 
 A future account model should be privacy-focused and optional. Push subscriptions would still remain device-specific.
 
+## Rate limiting is not authentication
+
+Fenéla is intentionally accountless.
+
+Public routes use server-side rate limiting to reduce repeated requests, storage abuse and unexpected AI usage. The limiter uses device-based signals and, for selected write routes, IP-based limits.
+
+This is useful for accidental repeated use and low-effort abuse. It is not a complete protection against deliberate misuse. A stronger solution would require authentication or a dedicated abuse-prevention layer, which is outside the MVP scope.
+
 ## Safety filter
 
 Fenéla MVP1 includes a basic pattern-based safety filter.

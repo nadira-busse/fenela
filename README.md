@@ -154,15 +154,18 @@ Current checks include:
 - production build validation;
 - internal Markdown link checking.
 
-The test suite currently includes 33 tests across:
+The test suite currently includes 38 tests across:
 
 - safety and ethical-use validation;
 - AI response parsing;
 - AI anchor validation;
 - AI fallback behavior;
-- API route validation.
+- API route validation;
+- public route rate limiting.
 
 The CI workflow in `.github/workflows/ci.yml` runs formatting, linting, tests and production build checks on push and pull requests.
+
+Fenéla also includes server-side rate limiting on public AI and reminder routes to reduce cost and storage abuse.
 
 A recent local validation run is included as runtime evidence:
 
@@ -299,6 +302,7 @@ Responsibilities are separated as follows:
 - AI parsing, validation and fallback logic live in testable library code;
 - push subscriptions are handled by push routes;
 - reminder jobs are handled by job routes and the cron-triggered push worker;
+- device- and IP-based rate limiting helps reduce unbounded cost and storage growth on the AI, subscription and scheduling routes;
 - real secrets live outside the repository.
 
 This keeps the codebase small enough to review and maintain.

@@ -197,8 +197,8 @@ npm run test
 Expected result:
 
 ```text
-Test Files  3 passed
-Tests       33 passed
+Test Files  4 passed
+Tests       38 passed
 ```
 
 The current test suite covers:
@@ -207,7 +207,8 @@ The current test suite covers:
 - AI response parsing;
 - AI anchor validation;
 - AI fallback behavior;
-- API route validation.
+- API route validation;
+- public route rate limiting.
 
 The AI route handler should stay thin. Parsing, validation and fallback behavior live in testable library code:
 
