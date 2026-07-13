@@ -266,13 +266,13 @@ export default function ScreeningScreen({ onDone }: Props) {
           <Hint>This keeps Fenéla personal without needing an account.</Hint>
         </Section>
 
-        <Section title="2) How much help do you want with choosing anchors?">
+        <Section title="2) Would you like help choosing anchors?">
           <Radio
             name="anchorChoiceHelp"
             value={mode}
             onChange={setMode}
             options={[
-              { value: "I_DECIDE", label: "I decide" },
+              { value: "I_DECIDE", label: "I’ll choose my own" },
               { value: "SUGGEST_ANCHORS", label: "Suggest anchors" },
             ]}
           />

@@ -190,8 +190,11 @@ function buildActionNudge(input: {
   return "Keep it small enough to start.";
 }
 
-function buildWhyReminder(ctx: AICtx) {
-  const why = safeDisplayLine(ctx.intake.goalWhy);
+// Prefer the AI-refined whyLine (already computed in getAICopy via
+// getInterpretation) over re-deriving it from the raw intake text. Falls
+// back to the raw text only when no interpretation is available.
+function buildWhyReminder(ctx: AICtx, interpretation: PersonalAnchorInterpretation) {
+  const why = interpretation.whyLine || safeDisplayLine(ctx.intake.goalWhy);
   return why ? `Remember your why:\n${why}` : "";
 }
 
@@ -255,7 +258,7 @@ export function getAICopy(ctx: AICtx): AICopy {
   if (ctx.state === "LATER_EMPATHY") {
     return {
       laterEmpathyTitle: noPressure ? "No pressure." : "Paused.",
-      laterEmpathyLine: "Choose what helps next.",
+      laterEmpathyLine: "We’ll come back to this anchor later.",
     };
   }
 
@@ -270,9 +273,10 @@ export function getAICopy(ctx: AICtx): AICopy {
 
     return {
       pauseTitle: "Pause noted",
+      pauseSubline: interpretation.frictionLine || undefined,
       pausePrompt: prompt,
       pausePlaceholder: "One honest sentence is enough...",
-      pauseSaveCta: "Save & try later",
+      pauseSaveCta: "Try again later",
       pauseDoNowCta: "I'll do it now",
     };
   }
@@ -282,7 +286,7 @@ export function getAICopy(ctx: AICtx): AICopy {
     return {
       directionalTitle: "Parked for today",
       directionalSubline: lowRepetition ? "No failure here." : "No failure here. Just steering.",
-      directionalLine: buildWhyReminder(ctx),
+      directionalLine: buildWhyReminder(ctx, interpretation),
       directionalNote: "Let's try again tomorrow.",
       directionalCta: "Okay",
     };

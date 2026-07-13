@@ -1,264 +1,142 @@
 # Fenéla
 
-Fenéla is a small accountability app for moments when everything feels too much.
+Fenéla is a calm accountability app for moments when a goal feels too large to start. It helps the user turn that goal into manageable actions and focus on one step at a time.
 
-The app is built around one simple loop:
+The app is built around one focused loop:
 
 ```text
-overwhelm -> one small action -> gentle accountability -> daily return
+overwhelm → one goal → small anchors → one step at a time → gentle accountability → daily return
 ```
 
-When someone feels overwhelmed, a larger planning system is often not the answer. More options, more dashboards and more pressure can make the problem harder.
+When someone already feels overwhelmed, a larger planning system can add more decisions and more pressure. Fenéla takes a different approach.
 
-Fenéla keeps the next step small. The user chooses one anchor for the day, gets gentle accountability around that action, and can return daily.
+The user starts with one goal and explains what is making it difficult. Fenéla can then use optional AI assistance to turn that goal into small, concrete anchors.
 
-This is a public MIT-licensed project. It is also part of my portfolio, because it shows how I approach product scope, safety, and keeping a codebase maintainable.
+During the day, Fenéla presents one anchor at a time. This limits the immediate decision while still allowing the user to work toward a larger goal.
 
 ## Why I built this
 
-I built Fenéla to explore a small product constraint:
+I built Fenéla around a practical problem: when someone feels overwhelmed, even a simple action can be difficult to start.
 
-```text
-Can an app help someone move from overwhelm to one realistic action without turning into another productivity system?
-```
+Most productivity tools assume that the user is ready to plan, prioritise and make several decisions. Fenéla is designed for moments when that is already too much. It reduces the immediate task by presenting one small, concrete action at a time.
 
-That constraint shaped the project.
+Sometimes the difficulty is not only taking the first step, but identifying what that step should be. Optional AI assistance supports this part of the flow. The user describes one goal, the current friction and why the goal matters. The goal gives Fenéla a direction. The current friction helps it suggest a smaller and more realistic starting point, while the reason behind the goal helps keep the suggestions connected to what matters to the user. Fenéla then generates three small, concrete anchors.
 
-Fenéla is not trying to solve everything. It is not a full planner, therapy app or coaching platform. It is intentionally narrow: choose one small anchor, receive light accountability, and come back daily.
+The user can use those anchors as they are, regenerate them, edit them or add their own until the set contains up to five anchors.
+
+The AI provides suggestions, not decisions. The user remains in control of the goal, the selected anchors and what happens next.
+
+Fenéla has a practical and limited role: help the user take a realistic first step, repeat those actions over time and gradually build a routine they can continue independently.
 
 ## Screenshots
 
-Fenéla is intentionally small: setup, one focus, AI-assisted anchor suggestions, and a calm accountability screen.
+The screenshots below show the main product flow: setup, goal intake, anchor selection and the accountability screen.
 
-| Setup preferences                                                        | Personalization choices                                                              |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| ![Fenéla setup preferences](assets/screenshots/01-setup-preferences.png) | ![Fenéla personalization choices](assets/screenshots/02-personalization-choices.png) |
+### Setup and personalization
 
-| Focus intake                                                   | AI anchor suggestions                                                            |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| ![Fenéla focus intake](assets/screenshots/03-focus-intake.png) | ![Fenéla AI anchor suggestions](assets/screenshots/04-ai-anchor-suggestions.png) |
+<p>
+  <img src="assets/screenshots/01-setup-preferences.png" alt="Fenéla setup preferences" width="46%">
+  <img src="assets/screenshots/02-personalization-choices.png" alt="Fenéla personalization choices" width="46%">
+</p>
 
-| Coaching screen                                                      |
-| -------------------------------------------------------------------- |
-| ![Fenéla coaching screen](assets/screenshots/05-coaching-screen.png) |
+| Goal intake                                                   | AI-assisted anchor suggestions                                                            |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ![Fenéla goal intake](assets/screenshots/03-focus-intake.png) | ![Fenéla AI-assisted anchor suggestions](assets/screenshots/04-ai-anchor-suggestions.png) |
+
+| Accountability screen                                                      |
+| -------------------------------------------------------------------------- |
+| ![Fenéla accountability screen](assets/screenshots/05-coaching-screen.png) |
 
 ## Demo
 
 A short demo video is available here:
 
-[Watch the Fenéla demo](https://youtu.be/nex6pIeaWv0)
+[Watch the Fenéla demo](https://youtu.be/6Z-GQQ_p8jg)
+
+## Project status
+
+Fenéla is a working application that I use myself. When regular use shows that something can be clearer or work better, I may improve it. I maintain the project at a sustainable pace alongside my other work, without a fixed release schedule.
 
 ## What Fenéla does
 
 Fenéla helps a user:
 
-- name one small action for the day;
-- turn that action into a short daily anchor;
-- get optional AI-assisted suggestions;
+- choose one personal goal;
+- describe what is making that goal difficult and why it matters;
+- use optional AI assistance to turn the goal into three small anchors;
+- use, regenerate, edit or remove the suggested anchors, and add their own until the set contains up to five anchors;
+- focus on one anchor at a time;
+- mark an anchor as done or postpone it;
+- automatically park an anchor for the day after it has been postponed three times;
 - enable, disable or adjust optional reminders;
 - continue without reminders if they prefer;
-- avoid being pushed into a large planning workflow.
+- return to the same anchors on another day without rebuilding the plan.
 
-The app is built around low-friction use. If a feature adds pressure or cognitive load without supporting the core loop, it does not belong in the MVP.
+The app is designed for low-friction use. If a feature adds pressure or cognitive load without supporting the core loop, it does not belong in the MVP.
 
-### Daily anchor repetition
+### Reusing saved anchors
 
-Fenéla intentionally repeats the same saved care anchors across days.
+Fenéla keeps the user's saved anchors available across days.
 
-This is not a missing variation feature. It is part of the MVP design. The user should not have to make a new plan every day. Repetition lowers choice pressure and makes the app easier to return to.
+This supports two different ways of using the app. Someone who is rebuilding or establishing a routine can repeat the same familiar actions over time instead of creating a new plan every morning. A user working toward a specific daily goal can change the plan whenever that goal changes.
 
-The user can reset the current day while keeping the same anchors, or start a new goal when the direction no longer fits.
+The user can reset the current day while keeping the existing anchors, or start again with a different goal.
 
-## What Fenéla does not do
+## Product boundary
 
-Fenéla is intentionally not:
+Fenéla is an accountability app, not a therapy, medical or full productivity tool. It does not replace professional support.
 
-- a therapy app;
-- a medical or mental health tool;
-- a coaching platform;
-- a full productivity suite;
-- a habit-tracking dashboard;
-- a replacement for professional support.
+## Technical overview
 
-This boundary matters. Fenéla is meant to support one small action, not diagnose, treat or manage someone's life.
+Fenéla is built with Next.js, React and TypeScript.
 
-## MVP scope
+The application separates:
 
-Current MVP functionality:
+- React components for the user flow;
+- storage helpers for screening, anchors and day state;
+- a narrow AI route with separate parsing, validation, repair and fallback logic;
+- push and reminder routes for subscriptions, scheduled jobs and delivery.
 
-- onboarding and screening flow;
-- anchor creation flow;
-- optional AI-assisted anchor suggestions;
-- optional reminders;
-- reminder settings for turning reminders on/off and changing the daily start time;
-- web push notification infrastructure;
-- VAPID-based push configuration;
-- KV-backed reminder/job storage;
-- cron-triggered reminder processing;
-- local environment setup through `.env.local`;
-- production build support with Next.js.
+Vitest covers core application and API behavior. GitHub Actions runs formatting, linting, tests and the production build.
 
-Fenéla keeps daily anchors stable by design. The same anchors return when the user resets the day, so the app stays predictable and low-friction.
-
-Out of scope for the MVP:
-
-- user accounts;
-- complex dashboards;
-- streaks or heavy gamification;
-- journaling;
-- analytics;
-- paid features;
-- multi-language support;
-- community features;
-- advanced AI planning.
-
-The MVP is deliberately small to keep the product easy to use, review and maintain.
-
-## Product principles
-
-Fenéla is designed to be:
-
-- calm;
-- lightweight;
-- predictable;
-- low-friction;
-- easy to understand;
-- easy to run locally;
-- easy to maintain;
-- limited in scope.
-
-The main product risk is scope creep. It would be easy to turn Fenéla into a planner, coach, journal or habit system. I chose not to do that for the MVP.
-
-## Tech stack
-
-- Next.js
-- React
-- TypeScript
-- Vitest
-- GitHub Actions
-- Web Push / VAPID
-- Vercel KV-compatible storage
-- OpenAI API for optional AI assistance
-
-AI is not the core product. The core product is the accountability loop. AI only supports bounded anchor suggestions.
+See the [architecture overview](architecture/architecture-overview.md) for the complete structure.
 
 ## Engineering quality
 
-Fenéla includes automated validation for the parts of the app where regressions would matter most.
+The repository includes:
 
-Current checks include:
-
-- Prettier formatting;
-- ESLint;
-- Vitest unit and API tests;
+- Prettier and ESLint checks;
+- Vitest unit and API-route tests;
 - production build validation;
-- internal Markdown link checking.
+- internal Markdown link checking;
+- GitHub Actions for pushes and pull requests;
+- rate limiting on public cost- and storage-sensitive routes.
 
-The test suite currently includes 38 tests across:
+The tests cover AI parsing and fallback behavior, safety validation, route boundaries, reminder payloads and rate limiting.
 
-- safety and ethical-use validation;
-- AI response parsing;
-- AI anchor validation;
-- AI fallback behavior;
-- API route validation;
-- public route rate limiting.
-
-The CI workflow in `.github/workflows/ci.yml` runs formatting, linting, tests and production build checks on push and pull requests.
+The CI workflow in `.github/workflows/ci.yml` runs formatting, linting, tests and production build checks on pushes and pull requests.
 
 Fenéla also includes server-side rate limiting on public AI and reminder routes to reduce cost and storage abuse.
 
-A recent local validation run is included as runtime evidence:
+Recent validation runs on Windows PowerShell and Linux through WSL are included as runtime evidence:
 
-![Fenéla quality check terminal output](assets/screenshots/06-quality-check-terminal.png)
+| Windows PowerShell                                                                                         | Linux through WSL                                                                 |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| ![Fenéla quality checks on Windows PowerShell](assets/screenshots/06-windows-powershell-quality-check.png) | ![Fenéla quality checks through WSL](assets/screenshots/07-wsl-quality-check.png) |
 
-## Local setup
-
-### 1. Install dependencies
+## Quick start
 
 ```bash
 npm install
-```
-
-### 2. Create the environment file
-
-Copy the example file:
-
-```bash
 cp .env.example .env.local
-```
-
-On Windows PowerShell:
-
-```powershell
-Copy-Item ".env.example" ".env.local"
-```
-
-### 3. Fill the required environment variables
-
-```env
-# OpenAI
-OPENAI_API_KEY=
-OPENAI_MODEL=
-
-# Web Push / VAPID
-WEB_PUSH_PUBLIC_KEY=
-WEB_PUSH_PRIVATE_KEY=
-WEB_PUSH_SUBJECT=
-
-# Vercel KV / storage
-STORAGE_KV_REST_API_URL=
-STORAGE_KV_REST_API_TOKEN=
-
-# Cron protection
-CRON_SECRET=
-```
-
-Do not commit `.env.local` or real secrets.
-
-### 4. Run locally
-
-```bash
 npm run dev
 ```
 
-Then open:
+---
 
-```text
-http://localhost:3000
-```
+Open the local URL shown in the terminal.
 
-### 5. Build for production
-
-```bash
-npm run build
-```
-
-## Quality checks
-
-Before committing changes, run:
-
-```bash
-npm run format:check
-npm run lint
-npm run test
-npm run build
-```
-
-Run the internal link checker as well.
-
-On Windows:
-
-```powershell
-py scripts/check_internal_links.py
-```
-
-On macOS/Linux:
-
-```bash
-python3 scripts/check_internal_links.py
-```
-
-The link checker scans Markdown files in the repository and checks whether relative internal links point to existing files. External links, mail links and in-page anchors are skipped.
+The application requires environment variables for optional AI, Web Push, storage and cron protection. See [Local setup](docs/technical/local-setup.md) for configuration, validation and troubleshooting.
 
 ## Environment variables
 
@@ -273,36 +151,24 @@ The link checker scans Markdown files in the repository and checks whether relat
 | `STORAGE_KV_REST_API_TOKEN` | Token for KV-compatible storage access                    |
 | `CRON_SECRET`               | Shared secret used to protect the cron-triggered endpoint |
 
-When connecting a new Upstash/Vercel KV database through an integration, the generated variable names may not match the names used by Fenéla. Fenéla expects the `STORAGE_KV_*` names above.
+When connecting a new Upstash or Vercel KV database through an integration, the generated variable names may not match the names used by Fenéla. Fenéla expects the `STORAGE_KV_*` names above.
 
 ## Documentation
 
-- [MVP scope](docs/product/mvp-scope.md)
-- [Product positioning](docs/product/product-positioning.md)
-- [AI and ethical use guardrails](docs/product/ai-guardrails.md)
+For a technical review, the suggested reading order is:
+
+1. [Architecture overview](architecture/architecture-overview.md) — application structure, responsibilities and data flow.
+2. [AI and ethical-use guardrails](docs/product/ai-guardrails.md) — AI boundaries, safety decisions and user control.
+3. [Maintenance notes](docs/technical/maintenance-notes.md) — device cleanup, dependency maintenance and recurring operational details.
+4. [MVP scope](docs/product/mvp-scope.md) — implemented functionality and deliberate scope boundaries.
+
+Additional documentation:
+
 - [Known limitations](docs/product/known-limitations.md)
 - [Local setup](docs/technical/local-setup.md)
-- [Known technical notes](docs/technical/known-technical-notes.md)
-- [UX review](docs/ux/ux-review.md)
-- [Architecture overview](architecture/architecture-overview.md)
 
-## Public repository status
+## License
 
-This is a public MIT-licensed project.
+Fenéla is available under the [MIT License](LICENSE).
 
-Others may use, study, adapt and share the software under the MIT License. I do not position Fenéla as an open-source community project. It is a publicly available application and portfolio project.
-
-## Architecture notes
-
-Responsibilities are separated as follows:
-
-- UI and product flow live in the app components;
-- local state and day state live in storage helpers;
-- AI support is limited to `/api/ai/anchors`;
-- AI parsing, validation and fallback logic live in testable library code;
-- push subscriptions are handled by push routes;
-- reminder jobs are handled by job routes and the cron-triggered push worker;
-- device- and IP-based rate limiting helps reduce unbounded cost and storage growth on the AI, subscription and scheduling routes;
-- real secrets live outside the repository.
-
-This keeps the codebase small enough to review and maintain.
+Attribution to the original project is appreciated when Fenéla or substantial parts of it are reused.

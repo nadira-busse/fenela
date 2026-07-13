@@ -1,50 +1,36 @@
 # AI and Ethical Use Guardrails
 
-Fenéla uses AI only for bounded anchor suggestions.
+Fenéla uses AI for one limited purpose: generating three anchor suggestions from the user's goal, current friction and motivation.
 
-AI is not the product. The product is the loop:
-
-```text
-overwhelm -> one small action -> gentle accountability -> daily return
-```
-
-The AI layer exists only to help a user turn their own goal, friction and motivation into small anchor suggestions.
+AI supports the user when they know what they want to do but cannot easily decide where to begin. It does not choose the goal or replace the deterministic application flow.
 
 ## AI scope
 
-AI may help with:
+When AI assistance is enabled, Fenéla:
 
-- suggesting smaller actions;
-- rephrasing vague input into practical anchors;
-- reducing a large intention into one realistic next step;
-- using the user's stated motivation to make suggestions less generic.
+- turns the user's goal into three short, concrete anchor suggestions;
+- uses the stated friction and motivation to make those suggestions more relevant;
+- turns vague input into practical starting points;
+- reduces the mental effort required to decide where to begin.
 
-AI must not become:
+The user remains in control. Suggestions can be kept, regenerated, edited or removed, and manual anchors can be added before the set is saved.
 
-- a therapist;
-- a medical advisor;
+Fenéla does not use AI as:
+
+- an open-ended chatbot;
+- a therapist or medical advisor;
 - a crisis support system;
 - a life coach;
 - a full planner;
 - a broad productivity assistant.
 
-## Bounded route
-
-The AI route is:
-
-```text
-/api/ai/anchors
-```
-
-It is intentionally narrow. It should generate anchor suggestions, not open-ended coaching output.
-
-The parsing, validation and fallback logic for AI-assisted anchors should remain in testable library code, separate from the route handler. The route should orchestrate the request; the reusable logic should remain easy to test.
+The technical route flow, validation sequence and fallback behavior are documented in [`architecture-overview.md`](../../architecture/architecture-overview.md).
 
 ## Input quality guardrails
 
-Fenéla should reject very low-quality input before AI generation.
+Fenéla rejects input that does not contain enough meaningful context.
 
-Examples that should be rejected:
+Examples include:
 
 ```text
 j
@@ -53,102 +39,91 @@ abc
 me
 ```
 
-The goal is not perfect language understanding. The goal is to avoid asking the AI to rescue meaningless input.
+The validation is deliberately simple. It checks whether the input contains enough words and variation to support a useful request.
 
-## Ethical use guardrails
-
-Fenéla should not help users turn harmful, abusive, illegal or exploitative intentions into small actions.
-
-The AI-assisted flow should reject or avoid generating suggestions for goals involving:
-
-- violence or threats;
-- stalking or harassment;
-- fraud or theft;
-- weapons or physical harm;
-- illegal drug activity;
-- sexual exploitation or abuse;
-- malware, hacking or unauthorized access;
-- evading law enforcement or legal accountability;
-- self-harm or harm to others.
-
-When unsafe input is detected, Fenéla should ask the user to choose a safe, lawful and respectful goal instead.
-
-## Output guardrails
-
-AI output should be:
-
-- short;
-- practical;
-- non-clinical;
-- non-diagnostic;
-- non-pressuring;
-- limited to small anchors.
-
-AI output should avoid:
-
-- medical claims;
-- therapy claims;
-- diagnosis;
-- crisis handling;
-- promises of transformation;
-- pressure-based coaching language;
-- broad wellness boilerplate.
+It does not attempt full language understanding. Its purpose is to avoid sending meaningless input to the model and asking AI to infer a goal that the user did not provide.
 
 ## Safety boundary
 
-Fenéla includes a basic pattern-based safety filter.
+Fenéla must not turn harmful, abusive, illegal or exploitative intentions into actionable steps.
 
-This is not comprehensive content moderation, crisis detection or a therapeutic safety system. It is an MVP-level guardrail that blocks obvious unsafe patterns and documents the limits of the public project.
+The current safety layer combines:
 
-## Product boundary
+1. a deterministic, pattern-based filter for user input and saved anchors;
+2. prompt instructions that prevent the model from generating unsafe suggestions;
+3. output validation before generated anchors are accepted.
 
-Allowed:
+The filter targets explicit patterns involving:
 
-```text
-Help me make this action smaller.
-```
+- violence, threats, stalking or harassment;
+- theft, fraud, phishing or unauthorized access;
+- weapon-related harm;
+- drug dealing or smuggling;
+- sexual abuse or exploitation;
+- evading law enforcement or destroying evidence;
+- self-harm, suicide or harm to others.
 
-```text
-Suggest a realistic first step.
-```
+When unsafe intent is detected, Fenéla rejects the input and asks the user to choose a safe, lawful and respectful goal instead.
 
-```text
-Turn this into a daily anchor.
-```
-
-Not allowed for MVP:
-
-```text
-Create a full life plan.
-```
+The patterns are intentionally selective because some words also occur in harmless phrases, such as:
 
 ```text
-Analyze my mental health.
+kill it at my interview
+attack my todo list
+shoot for a promotion
+habit hack
+secret weapon
 ```
 
-```text
-Act as my therapist.
-```
+Several checks therefore require a person, malicious object or other harmful context before blocking the input.
 
-```text
-Help me do something harmful or illegal.
-```
+This reduces avoidable false positives, but indirect or unusual unsafe phrasing may still be missed. The filter is a basic MVP 1 guardrail, not comprehensive intent detection.
 
-## Validation boundary
+## Generation and output validation
 
-The AI-assisted flow should be validated with automated tests for the highest-risk behavior:
+The generation and repair prompts instruct the model to:
+
+- stay close to the user's goal, friction and motivation;
+- return exactly three short and actionable anchors;
+- keep the wording calm and non-pressuring;
+- avoid medical, therapeutic, diagnostic or crisis language;
+- avoid harmful, illegal, abusive or exploitative suggestions.
+
+Prompt instructions alone do not guarantee valid output.
+
+Every response is therefore parsed and checked for:
+
+- the expected structure;
+- exactly three anchors;
+- anchor length and quality;
+- relevance to the user's input;
+- safety.
+
+If the first response fails validation, Fenéla makes one constrained repair attempt.
+
+If the repaired response also fails, the app returns local deterministic suggestions instead of displaying invalid AI output.
+
+## Validation and tests
+
+The automated tests cover:
 
 - low-quality input rejection;
-- unsafe input rejection;
+- explicit self-harm detection;
+- direct violence against a person;
+- selected theft, fraud and cyber-abuse patterns;
+- selected Dutch violence patterns;
+- benign phrases that should not be blocked;
+- validation of individual anchors and anchor lists;
 - AI response parsing;
-- anchor validation;
 - fallback behavior;
 - API route validation.
 
-These tests do not prove full safety. They reduce regression risk for the bounded MVP behavior.
+These tests reduce regression risk for known behavior. They do not prove comprehensive moderation or complete safety coverage.
 
-## Result
+## Known limits
 
-Fenéla uses AI where it reduces friction.
+The current guardrails do not provide comprehensive content moderation, crisis assessment or reliable detection of every unsafe intention.
 
-It does not use AI to expand scope, increase dependency or normalize unsafe intent.
+The pattern filter can produce false positives and false negatives. Prompt instructions and model output can also fail.
+
+These limits are accepted for MVP 1 and are documented rather than hidden.

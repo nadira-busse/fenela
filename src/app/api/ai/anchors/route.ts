@@ -30,6 +30,16 @@ function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+// Rate limiting below bounds the number of OpenAI calls per hour, but not
+// the token size of any single call. These limits close that gap so one
+// allowed request cannot still send an unbounded amount of text.
+const MAX_INTAKE_LENGTH = 500;
+const MAX_NAME_LENGTH = 100;
+
+function hasBoundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
+}
+
 function validateRequestBody(body: unknown): AnchorsRequest | null {
   if (!body || typeof body !== "object") {
     return null;
@@ -46,9 +56,9 @@ function validateRequestBody(body: unknown): AnchorsRequest | null {
   }
 
   if (
-    !hasText(candidate.intake.goal) ||
-    !hasText(candidate.intake.struggle) ||
-    !hasText(candidate.intake.goalWhy)
+    !hasBoundedText(candidate.intake.goal, MAX_INTAKE_LENGTH) ||
+    !hasBoundedText(candidate.intake.struggle, MAX_INTAKE_LENGTH) ||
+    !hasBoundedText(candidate.intake.goalWhy, MAX_INTAKE_LENGTH)
   ) {
     return null;
   }
@@ -57,10 +67,12 @@ function validateRequestBody(body: unknown): AnchorsRequest | null {
     mode: candidate.mode,
     deviceId: hasText(candidate.deviceId) ? candidate.deviceId : undefined,
     intake: {
-      name: hasText(candidate.intake.name) ? candidate.intake.name : undefined,
-      goal: candidate.intake.goal,
-      struggle: candidate.intake.struggle,
-      goalWhy: candidate.intake.goalWhy,
+      name: hasBoundedText(candidate.intake.name, MAX_NAME_LENGTH)
+        ? candidate.intake.name.trim()
+        : undefined,
+      goal: candidate.intake.goal.trim(),
+      struggle: candidate.intake.struggle.trim(),
+      goalWhy: candidate.intake.goalWhy.trim(),
     },
     screening: candidate.screening ?? null,
   };

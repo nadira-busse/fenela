@@ -1,209 +1,244 @@
 # Architecture Overview
 
-Fenéla is a small Next.js application built around one product loop:
+This document describes the architecture of Fenéla MVP 1, including the current application, its routes, storage model and optional AI and reminder capabilities.
 
-```text
-overwhelm -> one small action -> gentle accountability -> daily return
-```
+Fenéla is a focused Next.js application. The user moves from one stated goal to a small set of anchors and then works through one anchor at a time.
 
-The architecture is intentionally simple. Fenéla does not need a complex platform structure for the current MVP. Every component serves one of three areas: the core anchor flow, optional AI support, or optional reminders.
+The core user experience remains separate from optional AI assistance, reminder delivery and supporting infrastructure. Server routes are used where they add clear value without making the main flow harder to understand.
 
 ## Architecture goals
 
-Fenéla should be:
+The current architecture keeps:
 
-- easy to run locally;
-- easy to understand from the repository;
-- small enough to maintain;
-- clear in its separation of responsibilities;
-- safe to publish as a public MIT-licensed project;
-- flexible enough to support optional AI and reminders without making them mandatory.
+- the repository understandable;
+- local setup and validation straightforward;
+- responsibilities separated;
+- state movement predictable;
+- abstractions limited to demonstrated needs;
+- AI and reminders optional within the user flow.
 
 ## High-level flow
 
 ```mermaid
 flowchart LR
-    subgraph core[Core flow]
-        Screening --> Intake
-        Intake --> Coaching
-        Coaching --> Return[Daily return]
-    end
+    Screening["Screening and preferences"]
+    Goal["Goal, friction and motivation"]
+    Choice{"Anchor preference"}
+    AI["AI suggests three anchors"]
+    Manual["User creates anchors"]
+    Review["Review and edit anchor set"]
+    Coaching["One anchor at a time"]
+    Return["Daily return"]
 
-    subgraph ai[Optional AI]
-        Intake -. request .-> API_AI[/api/ai/anchors]
-        API_AI -. suggestions .-> Intake
-    end
-
-    subgraph reminders[Optional reminders]
-        Coaching -. enable .-> Push[/api/push/subscribe]
-        Coaching -. schedule .-> Jobs[/api/jobs/*]
-        Jobs --> KV[(KV storage)]
-        Cron[/api/cron/push] --> KV
-        Cron -. notification .-> Device([Device])
-        Device -. returns user .-> Coaching
-    end
+    Screening --> Goal
+    Goal --> Choice
+    Choice -->|Suggest anchors| AI
+    Choice -->|Choose my own| Manual
+    AI --> Review
+    Manual --> Review
+    Review --> Coaching
+    Coaching --> Return
+    Return --> Coaching
 ```
 
-The core loop is the product. AI and reminders are optional supporting layers.
+The core product flow runs from screening and goal intake to an editable anchor set, followed by one anchor at a time. AI can help generate the initial suggestions, but the user can also create the anchors manually. Reminders support the daily return and remain separate from the core flow.
 
 ## Main responsibilities
 
-| Area               | Responsibility                                                             |
-| ------------------ | -------------------------------------------------------------------------- |
-| UI flow            | Guides the user through screening, anchor creation and reminder choices    |
-| Anchor logic       | Keeps the product focused on one small action                              |
-| AI route           | Provides optional bounded anchor suggestions                               |
-| Job routes         | Schedule and cancel reminder jobs                                          |
-| Cron route         | Processes due reminder jobs and sends push notifications                   |
-| Push routes        | Manage browser push subscriptions                                          |
-| Storage            | Stores reminder and job data outside the UI layer                          |
-| Environment config | Keeps secrets and deployment-specific values outside the public repository |
+| Area                      | Responsibility                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| React components          | Manage the user flow, screen state and presentation                                  |
+| Client storage            | Preserves screening answers, saved anchors, day state and local reminder preferences |
+| AI route                  | Validates intake and requests three optional anchor suggestions                      |
+| AI library logic          | Handles parsing, sanitization, validation, repair and fallback behavior              |
+| Push routes               | Manage the public key and browser push subscriptions                                 |
+| Job routes                | Schedule and cancel daily-start and reminder jobs                                    |
+| Cron route                | Reads due jobs and sends push notifications                                          |
+| Server storage            | Stores subscriptions, device references, reminder jobs and rate-limit state          |
+| Environment configuration | Keeps deployment-specific values and secrets outside the repository                  |
+
+## State and storage boundaries
+
+Fenéla uses two storage layers.
+
+### Browser storage
+
+The browser stores:
+
+- screening answers;
+- saved anchors;
+- active and parked day state;
+- local reminder preferences;
+- device-specific identifiers.
+
+This keeps the main product usable without a user account system.
+
+### KV-compatible server storage
+
+The server stores:
+
+- push subscriptions;
+- registered device references;
+- scheduled reminder jobs;
+- daily reminder pointers;
+- rate-limit counters.
+
+The MVP has no user account database or cross-device profile.
+
+## AI architecture
+
+The `/api/ai/anchors` route has a narrow responsibility:
+
+1. validate the request and intake;
+2. reject invalid or clearly unsafe input;
+3. request structured AI output when suggestions are enabled;
+4. parse, sanitize and validate the response;
+5. make one constrained repair attempt when the first response is invalid;
+6. return local deterministic suggestions when the AI service is unavailable, rate-limited or still produces invalid output after repair.
+
+Invalid or unsafe user input is rejected. Fenéla shows a clear message asking the user to choose a safe, lawful and respectful goal instead of generating fallback suggestions. When the user chooses to create anchors manually, the route does not call the AI service.
+
+The route handler orchestrates the request and model call.
+
+Reusable behavior remains outside the route in testable library code. This includes:
+
+- response parsing;
+- sanitization;
+- anchor validation;
+- safety validation;
+- repair handling;
+- fallback behavior.
+
+This separation keeps the AI behavior easier to test and prevents the route handler from becoming the only place where application rules live.
+
+AI is optional. The application should remain understandable as an accountability product without requiring the user to rely on model-generated suggestions.
 
 ## Route groups
 
-### UI
-
-The main application route is:
-
-```text
-/
-```
-
-This is where the user moves through the Fenéla flow.
-
-### AI route
+### AI
 
 ```text
 /api/ai/anchors
 ```
 
-This route supports optional AI-assisted anchor generation.
+Generates optional anchor suggestions from the user's goal, friction and motivation.
 
-AI is not required for the product concept. Fenéla should still make sense as a simple accountability app without AI.
-
-### Reminder and job routes
+### Reminder jobs
 
 ```text
 /api/jobs/schedule-daily-start
 /api/jobs/schedule-reminder
 /api/jobs/cancel
 /api/jobs/cancel-daily-start
+```
+
+These routes create and cancel reminder jobs.
+
+### Cron processing
+
+```text
 /api/cron/push
 ```
 
-These routes support reminder scheduling, reminder cancellation and push execution.
+This server-to-server route reads due reminder jobs and sends push notifications.
 
-The reminder system is optional. The user must be able to continue without enabling reminders.
-
-### Push routes
+### Push setup
 
 ```text
 /api/push/public-key
 /api/push/subscribe
 ```
 
-These routes support browser push notification setup.
+These routes provide the public VAPID key and store browser push subscriptions.
 
-Push notifications are infrastructure, not the core user experience.
+## Route boundaries
 
-## Reminder architecture
+The current application has no user authentication. Public routes therefore rely on validation, bounded payloads and rate limiting rather than verified user identity.
 
-Fenéla uses device-based reminder setup in MVP1.
+| Route                            | Method | Exposure         | Data effect                                                        | Cost or storage effect    | Protection                                                                              |
+| -------------------------------- | ------ | ---------------- | ------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------- |
+| `/api/ai/anchors`                | `POST` | Public           | Does not persist user content; may write rate-limit state          | Can use OpenAI credits    | Intake limits, safety checks, device-based rate limiting and external spending controls |
+| `/api/push/public-key`           | `GET`  | Public read-only | Returns the public VAPID key                                       | No storage growth         | Returns only public configuration                                                       |
+| `/api/push/subscribe`            | `POST` | Public write     | Stores or replaces a device subscription                           | Can create KV records     | Input validation and device/IP rate limiting                                            |
+| `/api/jobs/schedule-daily-start` | `POST` | Public write     | Replaces and stores a daily reminder job                           | Can create KV records     | Existing subscription requirement and device rate limiting                              |
+| `/api/jobs/schedule-reminder`    | `POST` | Public write     | Stores a task reminder job                                         | Can create KV records     | Payload limits and device/IP rate limiting                                              |
+| `/api/jobs/cancel`               | `POST` | Public write     | Deletes one device job                                             | No storage growth         | Requires a device ID and job ID                                                         |
+| `/api/jobs/cancel-daily-start`   | `POST` | Public write     | Deletes the active daily reminder job and pointer                  | No storage growth         | Requires a device ID                                                                    |
+| `/api/cron/push`                 | `GET`  | Server-to-server | Reads, deletes and reschedules jobs, then sends push notifications | Can trigger push delivery | Requires `CRON_SECRET` through Bearer authorization                                     |
 
-The reminder flow is:
+Device IDs identify a browser or installed PWA. They do not prove user identity.
+
+### Rate limiting and abuse boundaries
+
+Rate limiting is applied to the public routes that can create external cost or KV growth:
+
+```text
+/api/ai/anchors
+/api/push/subscribe
+/api/jobs/schedule-daily-start
+/api/jobs/schedule-reminder
+```
+
+The AI route limits the OpenAI-cost path. Subscription and reminder routes limit repeated writes. Relevant routes also bound request size, including intake length, reminder delay, title, body and URL values.
+
+When the AI route reaches its limit, Fenéla returns deterministic suggestions in the existing response shape. Reminder and subscription routes return HTTP `429`.
+
+The shared rate limiter uses the existing KV store and fails open when KV is unavailable or the check itself errors. This prevents a supporting guardrail from blocking the core flow, but it also means rate limiting is not complete abuse prevention.
+
+Account-level OpenAI spending limits remain the final cost backstop outside the repository.
+
+The cron route is not public application traffic. It requires `CRON_SECRET` and rejects unauthorized requests.
+
+## Reminder and push architecture
+
+Fenéla uses device-based reminders.
 
 ```mermaid
 flowchart TD
-    Browser([Browser / device])
-    Browser --> Permission[Notification permission]
-    Permission --> SW[Service worker registration]
-    SW --> PushSub[Push subscription]
-    PushSub --> Subscribe[/api/push/subscribe]
-    Subscribe --> KV[(KV storage)]
-    Browser --> Schedule[/api/jobs/schedule-daily-start]
-    Schedule --> KV
-    Cron[/api/cron/push] -->|reads due jobs| KV
-    Cron -->|web push| Browser
+    Browser["Browser / device"]
+    Permission["Notification permission"]
+    ServiceWorker["Service worker registration"]
+    PushSubscription["Push subscription"]
+    SubscribeRoute["/api/push/subscribe"]
+    ScheduleRoute["/api/jobs/schedule-daily-start"]
+    Storage[("KV-compatible storage")]
+    CronRoute["/api/cron/push"]
+    PushService["Web Push delivery"]
+    Notification["Notification on device"]
+
+    Browser --> Permission
+    Permission --> ServiceWorker
+    ServiceWorker --> PushSubscription
+    PushSubscription --> SubscribeRoute
+    SubscribeRoute --> Storage
+
+    Browser --> ScheduleRoute
+    ScheduleRoute --> Storage
+
+    CronRoute -->|"reads due jobs and subscriptions"| Storage
+    CronRoute --> PushService
+    PushService --> Notification
+    Notification --> Browser
 ```
 
-Reminder settings are intentionally separated from screening. Screening captures the first-run preference. Reminder settings let the user later enable, disable or adjust reminders on the current device.
+The reminder flow separates three concerns:
 
-Turning reminders off cancels the daily-start job for that device, but does not need to delete the push subscription. A subscription is device infrastructure. Enabled or disabled reminder state is product behavior.
+- the browser owns notification permission and service worker registration;
+- API routes store subscriptions and schedule jobs;
+- the cron route processes due jobs and sends notifications.
 
-## Data and configuration
+Reminder settings remain separate from screening.
 
-Fenéla uses environment variables for deployment-specific configuration.
+Screening records the first-run preference. The reminder settings allow the user to enable, disable or adjust reminders later on the current device.
 
-```env
-OPENAI_API_KEY=
-OPENAI_MODEL=
-WEB_PUSH_PUBLIC_KEY=
-WEB_PUSH_PRIVATE_KEY=
-WEB_PUSH_SUBJECT=
-STORAGE_KV_REST_API_URL=
-STORAGE_KV_REST_API_TOKEN=
-CRON_SECRET=
-```
+Turning reminders off cancels the active daily-start job for that device. It does not need to delete the underlying push subscription.
 
-Real secrets must stay in `.env.local` or deployment configuration. They must not be committed to the public repository.
+The distinction matters:
 
-## Design decisions
+- the subscription is device infrastructure;
+- the enabled or disabled reminder state is product behavior.
 
-### AI is optional
-
-Decision:
-AI assistance remains optional.
-
-Reason:
-The core loop should work without requiring the user to rely on AI.
-
-Trade-off:
-The AI experience stays smaller than a full planning assistant.
-
-Impact:
-The app remains easier to explain, test and maintain.
-
-### Reminders are optional
-
-Decision:
-Reminder setup must not block the flow.
-
-Reason:
-A user who declines reminders should still be able to use Fenéla.
-
-Trade-off:
-Some users may never enable reminders.
-
-Impact:
-The app stays calmer and keeps reminder control with the user.
-
-### No user accounts in the MVP
-
-Decision:
-The MVP does not include user accounts.
-
-Reason:
-Accounts are not required for the core loop.
-
-Trade-off:
-There is no full profile system or cross-device account sync.
-
-Impact:
-The MVP remains lighter and safer to publish.
-
-## Storage boundary
-
-Fenéla stores reminder and job data in KV-compatible storage.
-
-The repository does not contain real user data, credentials or deployment secrets.
-
-Public repository rule:
-
-```text
-No secrets. No private user data. No local deployment files.
-```
-
-## Service worker and push notifications
+### Service worker
 
 The service worker lives in:
 
@@ -211,26 +246,100 @@ The service worker lives in:
 public/sw.js
 ```
 
-It supports browser push notification handling.
+It handles incoming browser push notifications.
 
-Push reliability depends on the browser, device, service worker registration, notification permission and deployment configuration. This is a known limitation of the MVP.
+Delivery reliability depends on:
 
-## What is intentionally not included
+- browser support;
+- device behavior;
+- notification permission;
+- service worker registration;
+- deployment configuration.
 
-Fenéla leaves out user accounts, dashboards, analytics, streaks, journaling and advanced AI planning. The full list of excluded features and the reasoning behind each exclusion is in [MVP scope](../docs/product/mvp-scope.md).
+Web Push is therefore useful support, but it is not treated as guaranteed delivery.
 
-Leaving these out keeps the core loop light.
+## Configuration boundary
 
-## Architecture risk
+Deployment-specific configuration is provided through environment variables.
 
-The main architecture risk is unnecessary expansion.
+The main configuration areas are:
 
-Features such as dashboards, journals, profiles, analytics and advanced AI planning would require more storage, more state, more privacy decisions and more UX complexity.
+- OpenAI access;
+- Web Push and VAPID;
+- KV-compatible storage;
+- cron authorization.
 
-For the MVP, that added complexity is not justified.
+Secrets remain server-side and outside the repository. See [Local setup](../docs/technical/local-setup.md) and [`.env.example`](../.env.example) for the complete configuration list.
 
-## Summary
+## Key architecture decisions
 
-Fenéla's architecture is small on purpose.
+### Optional AI
 
-It separates the core user flow from optional AI, optional reminders, push infrastructure and storage. That keeps the product understandable as a public MIT-licensed project and maintainable as a portfolio-grade app.
+AI is isolated behind one route and remains outside the core product dependency.
+
+See [ADR-001: Optional AI-Assisted Anchors](../decisions/ADR-001-ai-assisted-anchors.md)
+
+### Optional reminders
+
+Reminder setup does not block onboarding or the accountability flow.
+
+See [ADR-002: Optional Reminders](../decisions/ADR-002-optional-reminders.md).
+
+### No user accounts
+
+The current version uses local and device-based state and does not require a user account.
+
+This keeps the current implementation focused by avoiding:
+
+- authentication and authorization;
+- profile and account management;
+- cross-device synchronization;
+- additional persistent personal data;
+- account recovery and deletion flows.
+
+Accounts are not required for the current core loop. They are not ruled out for a future version if a clear product need emerges, such as cross-device continuity or user-controlled long-term insights.
+
+Introducing accounts would require a separate product and architecture decision because it changes the data, privacy and security model.
+
+### Safety and validation
+
+Safety controls are split across several layers:
+
+- input-quality checks reject meaningless intake;
+- a deterministic pattern filter blocks explicit unsafe intent;
+- AI prompts define a broader behavioral boundary;
+- generated output is parsed and validated before use;
+- public routes apply payload limits and rate limiting;
+- secrets remain outside client code and repository history.
+
+These controls reduce risk. They do not create complete content moderation, identity verification or abuse prevention.
+
+The AI-specific limits are documented in [AI and ethical-use guardrails](../docs/product/ai-guardrails.md). Operational cleanup and dependency details are documented in [Maintenance notes](../docs/technical/maintenance-notes.md).
+
+## Future architecture decisions
+
+Accounts, cross-device synchronization, persisted reflection data or long-term insights would change the current identity, storage and privacy model.
+
+These capabilities are not excluded, but each requires a separate product and architecture decision covering:
+
+- identity and authorization;
+- data retention and deletion;
+- synchronization and migration;
+- privacy and user control;
+- client and server state.
+
+The user experience must remain calm and focused even if the supporting architecture grows.
+
+## Scope boundary
+
+Product exclusions such as accounts, dashboards, streaks, journaling and advanced AI planning are documented in [MVP scope](../docs/product/mvp-scope.md).
+
+The architecture does not prepare for those features in advance. New abstractions should only be added when they solve an actual product or maintenance problem.
+
+## Further reading
+
+- [MVP scope](../docs/product/mvp-scope.md)
+- [AI and ethical-use guardrails](../docs/product/ai-guardrails.md)
+- [Maintenance notes](../docs/technical/maintenance-notes.md)
+- [ADR-001: Optional AI-Assisted Anchors](../decisions/ADR-001-ai-assisted-anchors.md)
+- [ADR-002: Optional Reminders](../decisions/ADR-002-optional-reminders.md)

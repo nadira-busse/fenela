@@ -1,77 +1,84 @@
 # Known Limitations
 
-Fenéla MVP1 is a small public MIT-licensed accountability app. Some limitations are intentional to keep the product simple and maintainable.
+This document describes the current boundaries of Fenéla MVP 1.
 
-## Device-based setup
+Some are deliberate product choices. Others follow from the current browser-, device- and infrastructure-based implementation.
 
-Fenéla MVP1 is device-based.
+## Device-based state
 
-If a user installs Fenéla on both laptop and phone, setup may need to be repeated on each device.
+Fenéla has no login or account synchronization.
 
-Different browsers, browser profiles or devices may create separate Fenéla installations because each environment has its own localStorage, service worker state, push permission and device ID.
+Screening answers, saved anchors, day state and reminder settings belong to the current browser or installed PWA.
 
-Possible extension: optional account sync.
+Using Fenéla on another device, in another browser or in another browser profile may require setup again.
+
+Push subscriptions also remain device-specific.
+
+Optional account synchronization would require a separate privacy and architecture decision.
 
 ## Push notifications
 
-Push notifications depend on browser, device, operating system and user permission state.
+Push notifications depend on:
 
-On iOS and iPadOS, Web Push should be tested as an installed Home Screen app, not only as a Safari tab.
+- browser support;
+- operating-system behavior;
+- notification permission;
+- service worker registration;
+- VAPID configuration;
+- storage availability;
+- cron-triggered processing.
 
-Reminder delivery is approximate because due jobs are processed by an external cron trigger.
+Reminder delivery is best effort.
+
+Timing can vary because delivery depends on the cron trigger, deployment availability and the receiving device.
+
+On iPhone and iPad, Web Push should be tested through a Home Screen installation rather than only in a regular Safari tab.
 
 ## Reminder settings
 
-Fenéla includes reminder settings so a user can turn reminders on or off and change the daily reminder time after onboarding.
+Reminder settings apply to the current browser or installed PWA.
 
-Turning reminders off cancels the daily-start job for the current device. It does not need to delete the browser push subscription.
+Changing or disabling reminders on one device does not update another device.
 
-## Incognito and private browsing
+## Private browsing
 
-Fenéla reminders should not be tested in incognito or private browsing mode.
+Private or incognito browsing may restrict:
 
-Incognito sessions may block or limit notification permissions, service workers, push subscriptions and persistent local storage. This can make reminders appear unavailable even when the app works correctly in a normal browser profile or installed PWA.
+- notification permission;
+- service workers;
+- push subscriptions;
+- persistent local storage.
 
-Incognito can be used for checking basic UI flows, but reminder and push notification tests should be done in a normal browser profile or installed Home Screen app.
+Use a normal browser profile or installed PWA when testing reminders.
 
-## Updates
+Private browsing is suitable only for basic UI checks.
 
-Normal app updates should not require users to delete and reinstall Fenéla.
+## PWA updates
 
-During development, reinstalling may sometimes be useful to reset service worker, manifest, localStorage or push subscription state.
+Fenéla does not include an in-app update prompt.
 
-Fenéla MVP1 does not include an in-app PWA update prompt.
+Browsers normally update the application automatically, but development testing may sometimes require clearing service worker or local browser state.
 
 ## Timezone
 
-Daily start reminders and day-state keys are currently interpreted using Europe/Amsterdam time in MVP1.
+Daily reminders and day-state keys use `Europe/Amsterdam`.
 
-## Account sync
+Users in other timezones may therefore see reminder timing or day boundaries that do not match their local time.
 
-Fenéla MVP1 does not include login or account sync. Screening answers, anchor preferences and reminder settings are device-based.
+## Public-route protection
 
-A future account model should be privacy-focused and optional. Push subscriptions would still remain device-specific.
+Fenéla has no user authentication.
 
-## Rate limiting is not authentication
+Public AI and reminder routes use validation and rate limiting to reduce repeated use, cost exposure and storage growth.
 
-Fenéla is intentionally accountless.
+These controls are not identity verification and do not fully prevent deliberate abuse.
 
-Public routes use server-side rate limiting to reduce repeated requests, storage abuse and unexpected AI usage. The limiter uses device-based signals and, for selected write routes, IP-based limits.
+Stronger protection would require authentication or a separate abuse-prevention design.
 
-This is useful for accidental repeated use and low-effort abuse. It is not a complete protection against deliberate misuse. A stronger solution would require authentication or a dedicated abuse-prevention layer, which is outside the MVP scope.
+## AI and safety limits
 
-## Safety filter
+AI is currently limited to generating anchor suggestions.
 
-Fenéla MVP1 includes a basic pattern-based safety filter.
+The safety layer combines pattern-based checks, prompt restrictions and output validation. It does not provide comprehensive content moderation or reliable detection of every unsafe intention.
 
-It is not comprehensive content moderation, crisis detection or a therapeutic safety system.
-
-## AI limitations
-
-AI assistance is limited to bounded anchor suggestions.
-
-Fenéla is not a general AI coach, therapist, planner or crisis support tool.
-
-## Result
-
-These limitations keep the MVP small, predictable and maintainable.
+Indirect or unusual unsafe phrasing may still be missed.

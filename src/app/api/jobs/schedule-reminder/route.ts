@@ -5,6 +5,14 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
+// Rate limiting below bounds how many jobs a device or IP can create per
+// hour, but not the size of any single job's payload. These limits close
+// that gap so one allowed request cannot still store an unbounded record.
+const DEFAULT_DUE_IN_MS = 30 * 60 * 1000;
+const MAX_DUE_IN_MS = 24 * 60 * 60 * 1000;
+const MAX_TITLE_LENGTH = 80;
+const MAX_BODY_LENGTH = 240;
+
 type Body = {
   deviceId: string;
   dueInMs?: number;
@@ -62,7 +70,27 @@ export async function POST(req: Request) {
     await kv.sadd(DEVICES_SET_KEY, deviceId);
 
     const dueInMs =
-      typeof body.dueInMs === "number" && body.dueInMs > 0 ? body.dueInMs : 30 * 60 * 1000;
+      typeof body.dueInMs === "number" &&
+      Number.isFinite(body.dueInMs) &&
+      body.dueInMs > 0 &&
+      body.dueInMs <= MAX_DUE_IN_MS
+        ? body.dueInMs
+        : DEFAULT_DUE_IN_MS;
+
+    const title =
+      typeof body.payload?.title === "string"
+        ? body.payload.title.trim().slice(0, MAX_TITLE_LENGTH)
+        : "";
+
+    const reminderBody =
+      typeof body.payload?.body === "string"
+        ? body.payload.body.trim().slice(0, MAX_BODY_LENGTH)
+        : "";
+
+    const url =
+      typeof body.payload?.url === "string" && body.payload.url.startsWith("/")
+        ? body.payload.url
+        : "/";
 
     const dueAt = Date.now() + dueInMs;
 
@@ -70,9 +98,9 @@ export async function POST(req: Request) {
       dueAt,
       kind: "TASK_REMINDER",
       payload: {
-        title: body.payload?.title ?? "Fenéla",
-        body: body.payload?.body ?? "Quick check-in: did you do it?",
-        url: body.payload?.url ?? "/",
+        title: title || "Fenéla",
+        body: reminderBody || "Quick check-in: did you do it?",
+        url,
       },
     });
 

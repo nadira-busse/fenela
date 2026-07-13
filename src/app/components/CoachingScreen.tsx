@@ -889,7 +889,7 @@ export default function CoachingScreen({
 
           <ActionBtn onClick={handleNow}>{ai.pauseDoNowCta ?? "I'll do it now"}</ActionBtn>
           <ActionBtn onClick={savePauseReason} variant="ghost">
-            {ai.pauseSaveCta ?? "Save & try later"}
+            {ai.pauseSaveCta ?? "Try again later"}
           </ActionBtn>
         </Card>
       </Shell>

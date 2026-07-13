@@ -239,7 +239,7 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
     {
       id: "intake-anchors",
       label: "Your daily care anchors",
-      helper: "I made a small starting point. You can edit anything.",
+      helper: "",
       placeholder: "e.g. Drink a glass of water",
       type: "anchors",
     },
@@ -253,6 +253,9 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
   const choiceMode = screening?.mode ?? "SUGGEST_ANCHORS";
   const userDecidesAnchors = choiceMode === "I_DECIDE";
+  const anchorsHelperText = userDecidesAnchors
+    ? "Add your own anchors. You can edit them before you begin."
+    : "I created three starting points. You can edit anything before you begin.";
 
   const goalValidation = useMemo(() => validateSafeUserText(goal), [goal]);
   const struggleValidation = useMemo(() => validateSafeUserText(struggle), [struggle]);
@@ -490,9 +493,9 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
               </label>
             )}
 
-            {current.helper && (
+            {(isAnchorsStep ? anchorsHelperText : current.helper) && (
               <p id={`${current.id}-helper`} className="text-sm text-black/60 leading-snug">
-                {current.helper}
+                {isAnchorsStep ? anchorsHelperText : current.helper}
               </p>
             )}
           </div>
@@ -594,7 +597,9 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-black/70">Anchors (edit anything)</div>
+                  <div className="text-sm font-semibold text-black/70">
+                    {userDecidesAnchors ? "Add your anchors" : "Review your anchors"}
+                  </div>
 
                   {!userDecidesAnchors && (
                     <button
