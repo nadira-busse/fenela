@@ -1,5 +1,7 @@
 # Fenéla
 
+[![CI](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml/badge.svg)](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml)
+
 Fenéla is a calm accountability app for moments when a goal feels too large to start. It helps the user turn that goal into manageable actions and focus on one step at a time.
 
 The app is built around one focused loop:
