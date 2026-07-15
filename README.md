@@ -169,6 +169,12 @@ Additional documentation:
 - [Known limitations](docs/product/known-limitations.md)
 - [Local setup](docs/technical/local-setup.md)
 
+## Author
+
+**Nadira Büsse**
+
+[LinkedIn](https://www.linkedin.com/in/nadirabusse)
+
 ## License
 
 Fenéla is available under the [MIT License](LICENSE).
