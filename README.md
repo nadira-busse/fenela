@@ -53,7 +53,7 @@ The screenshots below show the main product flow: setup, goal intake, anchor sel
 
 A short demo video is available here:
 
-[Watch the Fenéla demo](https://youtu.be/6Z-GQQ_p8jg)
+[Watch the Fenéla demo](https://youtu.be/zX39vEO2K78)
 
 ## Project status
 
