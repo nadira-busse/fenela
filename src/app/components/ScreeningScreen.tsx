@@ -11,6 +11,8 @@ import {
   saveScreening,
 } from "@/lib/screeningStorage";
 import { getOrCreateDeviceId } from "@/lib/device";
+import { getBrowserTimeZone } from "@/lib/browserTimeZone";
+import { saveUserPreferenceAction } from "@/server/preferences/saveUserPreferenceAction";
 
 type Props = { onDone: () => void };
 
@@ -139,6 +141,10 @@ export default function ScreeningScreen({ onDone }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [warning, setWarning] = useState("");
   const [canContinueWithoutReminders, setCanContinueWithoutReminders] = useState(false);
+  const [persistError, setPersistError] = useState<{
+    message: string;
+    canRetryAuth: boolean;
+  } | null>(null);
 
   const antiHelpOptions: { key: AntiHelp; label: string }[] = useMemo(
     () => [
@@ -173,9 +179,43 @@ export default function ScreeningScreen({ onDone }: Props) {
 
     setSubmitting(true);
     setWarning("");
+    setPersistError(null);
     setCanContinueWithoutReminders(false);
 
     try {
+      const timeZone = getBrowserTimeZone();
+
+      if (!timeZone) {
+        setPersistError({
+          message:
+            "Fenéla could not detect your timezone. Please try again in a supported browser.",
+          canRetryAuth: false,
+        });
+        return;
+      }
+
+      const result = await saveUserPreferenceAction({
+        displayName: name,
+        anchorChoiceMode: mode,
+        resistancePattern,
+        mainChallenge,
+        actionTrigger,
+        antiHelp,
+        timeZone,
+      });
+
+      if (!result.ok) {
+        setPersistError({
+          message: result.message,
+          canRetryAuth: result.error === "UNAUTHENTICATED",
+        });
+        return;
+      }
+
+      // The DB write is the canonical persistence step above; this keeps
+      // the existing local compatibility cache in sync so IntakeScreen/
+      // CoachingScreen (which still read via loadScreening()) see the same
+      // values without needing a broader refactor in this phase.
       saveCurrentScreening();
 
       if (dailyReminder === "NOT_NOW") {
@@ -243,6 +283,21 @@ export default function ScreeningScreen({ onDone }: Props) {
           focuses on one at a time.
         </p>
 
+        {persistError ? (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm"
+          >
+            <div className="font-semibold">Could not save your preferences</div>
+            <div className="mt-1 opacity-90">{persistError.message}</div>
+            {persistError.canRetryAuth ? (
+              <a href="/auth?next=%2F" className="mt-2 inline-block text-sm underline">
+                Sign in again
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
         {warning ? (
           <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">
             <div className="font-semibold">Reminder skipped</div>
@@ -267,7 +322,7 @@ export default function ScreeningScreen({ onDone }: Props) {
             autoComplete="given-name"
             className="mt-2 w-full rounded-xl border border-black/10 bg-white/5 px-3 py-2"
           />
-          <Hint>This keeps Fenéla personal without needing an account.</Hint>
+          <Hint>This is saved to your account so Fenéla remembers it next time.</Hint>
         </Section>
 
         <Section title="2) Would you like help choosing anchors?">

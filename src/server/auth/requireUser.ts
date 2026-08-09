@@ -36,3 +36,20 @@ export async function requireUser(): Promise<AuthenticatedUser> {
     email: data.user.email ?? undefined,
   };
 }
+
+/**
+ * Non-throwing counterpart for call sites that need to branch on
+ * authentication state (e.g. deciding what to render) rather than fail
+ * closed. A genuine infrastructure error (not "no session") still throws.
+ */
+export async function getOptionalUser(): Promise<AuthenticatedUser | null> {
+  try {
+    return await requireUser();
+  } catch (error) {
+    if (error instanceof UnauthenticatedError) {
+      return null;
+    }
+
+    throw error;
+  }
+}

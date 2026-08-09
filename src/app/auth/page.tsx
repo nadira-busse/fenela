@@ -1,4 +1,5 @@
 import { requireUser } from "@/server/auth/requireUser";
+import { safeRedirectPath } from "@/lib/auth/safeRedirect";
 import { AuthPanel } from "./AuthPanel";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export default async function AuthPage({
   const resolvedSearchParams = await searchParams;
   const errorParam = resolvedSearchParams.error;
   const error = typeof errorParam === "string" ? errorParam : undefined;
+  const nextParam = resolvedSearchParams.next;
+  const next = safeRedirectPath(typeof nextParam === "string" ? nextParam : undefined);
   const user = await getCurrentUser();
 
   return (
@@ -54,7 +57,7 @@ export default async function AuthPage({
           </form>
         </div>
       ) : (
-        <AuthPanel />
+        <AuthPanel next={next} />
       )}
     </main>
   );

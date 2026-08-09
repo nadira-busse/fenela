@@ -6,10 +6,22 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 type MagicLinkStatus = "idle" | "sending" | "sent" | "error";
 type GoogleStatus = "idle" | "redirecting" | "error";
 
-export function AuthPanel() {
+type Props = {
+  // Already validated server-side (safeRedirectPath) by src/app/auth/page.tsx
+  // before reaching this component.
+  next?: string;
+};
+
+export function AuthPanel({ next = "/" }: Props) {
   const [email, setEmail] = useState("");
   const [magicLinkStatus, setMagicLinkStatus] = useState<MagicLinkStatus>("idle");
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>("idle");
+
+  function callbackUrl() {
+    const url = new URL("/auth/callback", window.location.origin);
+    url.searchParams.set("next", next);
+    return url.toString();
+  }
 
   async function handleGoogleSignIn() {
     setGoogleStatus("redirecting");
@@ -18,7 +30,7 @@ export function AuthPanel() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl(),
       },
     });
 
@@ -43,7 +55,7 @@ export function AuthPanel() {
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: callbackUrl(),
       },
     });
 
