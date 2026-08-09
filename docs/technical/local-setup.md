@@ -129,7 +129,7 @@ No development-only, test or obsolete API routes should appear.
 
 ## 7. Supabase persistence foundation (MVP2, schema only)
 
-MVP2 introduces authenticated, user-owned persistence on Supabase (Auth + PostgreSQL). The current repository state adds only the schema/RLS foundation described in [ADR-003](../../decisions/ADR-003-authenticated-user-owned-persistence.md), [ADR-004](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md) and [ADR-005](../../decisions/ADR-005-deterministic-reflection-history.md). No application code reads or writes this schema yet.
+MVP2 introduces authenticated, user-owned persistence on Supabase (Auth + PostgreSQL). The current repository state adds the schema/RLS foundation described in [ADR-003](../../decisions/ADR-003-authenticated-user-owned-persistence.md), [ADR-004](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md) and [ADR-005](../../decisions/ADR-005-deterministic-reflection-history.md), plus (as of Phase 3C-2) an authentication foundation that establishes a verified Supabase Auth session. No application code reads or writes the MVP2 domain tables (`goals`, `anchors`, `action_events`, etc.) yet — only session/identity handling is wired in.
 
 ### Prerequisites
 
@@ -195,9 +195,25 @@ select set_config('request.jwt.claims', json_build_object('sub', '<user-b-uuid>'
 
 Use synthetic `auth.users` rows for this. Never test against real account data.
 
+### Authentication foundation (Phase 3C-2)
+
+With `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` set in `.env.local` (the local stack's values are printed by `npx supabase status`), `npm run dev` exposes a minimal `/auth` route that exercises the authentication foundation:
+
+- browser/server Supabase client boundary (`src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`);
+- session refresh on every request (`src/proxy.ts`);
+- `/auth/callback` — exchanges the Supabase auth code for a session;
+- `/auth/signout` — clears the session;
+- `src/server/auth/requireUser.ts` — the one place server code should ask "who is the current user?".
+
+This route is a technical validation surface, not a redesigned first-run flow — Fenéla's core product loop does not require an account yet.
+
+**Magic Link**: the local stack's Mailpit inbox (`http://127.0.0.1:54324`) receives the sign-in email. Request a link from `/auth`, open it in Mailpit, and follow it to complete the flow.
+
+**Google OAuth**: requires a Google OAuth client and provider configuration in the target Supabase project (local `supabase/config.toml` `[auth.external.google]`, or the hosted project's Auth settings) that this repository does not include. Without it, the technical initiation flow (`signInWithOAuth`) still runs, but the provider round-trip cannot complete locally.
+
 ### Environment note
 
-This repository's automated development environment does not have Docker (or Podman) installed, so `npx supabase start` cannot run there and the migration has not been applied against a live database in that environment. Validate it locally with Docker available before relying on it.
+This repository's automated development environment does not have Docker (or Podman) installed, so `npx supabase start` cannot run there and the migration has not been applied against a live database in that environment. Validate it locally with Docker available before relying on it. The same applies to manual authentication validation above.
 
 ## Optional features
 

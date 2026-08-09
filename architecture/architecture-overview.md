@@ -153,7 +153,7 @@ These routes provide the public VAPID key and store browser push subscriptions.
 
 ## Route boundaries
 
-The current application has no user authentication. Public routes therefore rely on validation, bounded payloads and rate limiting rather than verified user identity.
+The routes below are the current product surface and remain unauthenticated by design — they rely on validation, bounded payloads and rate limiting rather than verified user identity. A separate technical authentication foundation (Supabase Auth) now exists at `/auth`, `/auth/callback` and `/auth/signout` (see "Accepted MVP2 identity and persistence direction" below), but no route in this table reads or requires that session yet.
 
 | Route                            | Method | Exposure         | Data effect                                                        | Cost or storage effect    | Protection                                                                              |
 | -------------------------------- | ------ | ---------------- | ------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------- |
@@ -285,39 +285,42 @@ Reminder setup does not block onboarding or the accountability flow.
 
 See [ADR-002: Optional Reminders](../decisions/ADR-002-optional-reminders.md).
 
-### No user accounts
+### No user accounts in the core product loop
 
-The current version uses local and device-based state and does not require a user account.
+The core product loop uses local and device-based state and does not require a user account.
 
-This keeps the current implementation focused by avoiding:
+This keeps the current product implementation focused by avoiding, in the routes that make up that loop:
 
-- authentication and authorization;
 - profile and account management;
 - cross-device synchronization;
 - additional persistent personal data;
 - account recovery and deletion flows.
 
-Accounts are not required for the current core loop. They are not ruled out for a future version if a clear product need emerges, such as cross-device continuity or user-controlled long-term insights.
+Accounts are not required for the current core loop. A technical authentication foundation now exists as MVP2 infrastructure (see below), but it is not yet wired into onboarding, and no domain data (goals, anchors, reminders, reflections) is scoped to an authenticated user yet.
 
-Introducing accounts would require a separate product and architecture decision because it changes the data, privacy and security model.
+Introducing accounts into the core product loop would require a separate product decision because it changes the data, privacy and security model of that loop.
 
 ### Accepted MVP2 identity and persistence direction
 
-The current release still has no user accounts and remains browser- and device-based.
+The core product loop still has no user accounts and remains browser- and device-based.
 
-For MVP2, a separate architecture decision has now been accepted: persistent personal history will belong to an authenticated user rather than to a browser-generated device identity.
+For MVP2, a separate architecture decision has been accepted: persistent personal history will belong to an authenticated user rather than to a browser-generated device identity.
 
 The accepted MVP2 baseline uses Supabase Auth with PostgreSQL for user-owned persistence.
 
-This is a planned architecture change and is **not implemented in the current release**.
+This is being implemented in phases. The current release includes:
+
+- a version-controlled schema/RLS foundation under `supabase/migrations/` (Phase 3C-1);
+- a technical authentication foundation (Phase 3C-2): separate browser (`src/lib/supabase/client.ts`) and server (`src/lib/supabase/server.ts`) Supabase clients, a session-refresh boundary (`src/proxy.ts`), an `/auth/callback` route, a central `requireUser()` server helper, Google OAuth and Magic Link technical sign-in, and sign-out.
+
+Neither phase is wired into onboarding or the core product loop yet: no application code reads or writes the MVP2 domain tables (`goals`, `anchors`, `action_events`, etc.), and `requireUser()` is not called from any product route. That integration is separate, later work.
 
 See:
 
 - [ADR-003: Authenticated User-Owned Persistence](../decisions/ADR-003-authenticated-user-owned-persistence.md)
 - [ADR-004: Reminder Preferences and Device Ownership](../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
 - [ADR-005: Deterministic Reflection History](../decisions/ADR-005-deterministic-reflection-history.md)
-
-A version-controlled schema/RLS foundation for this domain model now exists under `supabase/migrations/`. It is infrastructure only: no authentication UI, onboarding integration or runtime persistence has been added, and no application code depends on it yet. See [Local setup](../docs/technical/local-setup.md) for how to run it.
+- [Local setup](../docs/technical/local-setup.md) for how to run the local Supabase stack and manually validate both the schema/RLS foundation and the authentication foundation.
 
 ### Safety and validation
 

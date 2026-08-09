@@ -13,6 +13,8 @@
     "db:types": "npx supabase gen types typescript --local > src/types/database.types.ts && npx prettier --write src/types/database.types.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.2",
     "@vercel/kv": "^1.0.0",
     "framer-motion": "^12.26.2",
     "next": "16.2.9",

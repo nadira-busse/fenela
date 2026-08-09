@@ -71,13 +71,13 @@ Users in other timezones may therefore see reminder timing or day boundaries tha
 
 ## Public-route protection
 
-Fenéla has no user authentication.
+Fenéla's public product routes have no user authentication.
 
 Public AI and reminder routes use validation and rate limiting to reduce repeated use, cost exposure and storage growth.
 
 These controls are not identity verification and do not fully prevent deliberate abuse.
 
-MVP2 will introduce authenticated ownership for persistent user and reminder data, but that architecture is not implemented in the current release.
+MVP2 will introduce authenticated ownership for persistent user and reminder data. A technical authentication foundation (Supabase Auth sign-in/sign-out) now exists at `/auth`, but it is not yet connected to any product route above, and no user or reminder data is scoped to an authenticated user in the current release.
 
 Rate limiting and other abuse controls will remain separate from authentication where they still serve a different purpose.
 
