@@ -693,7 +693,40 @@ Respect `.gitignore`, but also verify that previously tracked files are appropri
 
 ---
 
-# 27. Dependency discipline
+# 27. Private agent working context
+
+The repository may contain a local, Git-ignored directory:
+
+```text
+.agent-private/
+```
+
+This directory is reserved for non-public working context used by Nadira and coding agents.
+
+Examples include:
+
+implementation plans;
+architecture working notes;
+review notes;
+temporary audits;
+agent findings;
+phase handovers;
+unresolved questions;
+local decision-support documents.
+
+Rules:
+
+.agent-private/ must remain ignored by Git.
+Do not stage or commit files from .agent-private/.
+Do not link to .agent-private/ from public repository documentation.
+Files in .agent-private/ may be read and updated when the active task explicitly uses them.
+Public architectural decisions must be distilled into the appropriate public repository artifacts, such as ADRs or architecture documentation.
+Do not treat private working notes as implemented product behavior or accepted architecture unless a public decision document confirms that status.
+Do not move public documentation into .agent-private/ merely to avoid maintaining it.
+
+---
+
+# 28. Dependency discipline
 
 Do not add an npm package when the platform or existing dependencies already provide the required capability adequately.
 
@@ -708,7 +741,7 @@ Remove unused dependencies when their removal is within task scope and safe.
 
 ---
 
-# 28. Refactoring discipline
+# 29. Refactoring discipline
 
 Large files are not automatically defects.
 
@@ -731,7 +764,7 @@ Do not perform broad restructuring during an unrelated task.
 
 ---
 
-# 29. Coding-agent behavior
+# 30. Coding-agent behavior
 
 For every task:
 
@@ -751,7 +784,7 @@ If a task says analysis-only or documentation-only, do not modify runtime code.
 
 ---
 
-# 30. Final response requirements
+# 31. Final response requirements
 
 At the end of a coding task, report:
 
@@ -784,7 +817,7 @@ Do not claim:
 
 ---
 
-# 31. Core rule
+# 32. Core rule
 
 When choosing between a larger technically impressive solution and a smaller solution that fully satisfies Fenéla's real requirement:
 

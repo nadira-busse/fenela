@@ -57,7 +57,15 @@ A short demo video is available here:
 
 ## Project status
 
-Fenéla is a working application that I use myself. When regular use shows that something can be clearer or work better, I may improve it. I maintain the project at a sustainable pace alongside my other work, without a fixed release schedule.
+Fenéla is a working application that I use myself.
+
+MVP1 established the core product loop and remains the current public implementation.
+
+I am now using the project to deepen my software engineering and systems architecture skills. The next version has accepted architecture decisions around authenticated user-owned persistence, clearer reminder ownership and limited weekly/monthly continuity.
+
+Those MVP2 decisions are documented before implementation starts. They are not current product functionality.
+
+I continue to improve Fenéla when there is a clear product, engineering or maintenance reason to do so, rather than adding features simply to make the project larger.
 
 ## What Fenéla does
 

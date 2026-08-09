@@ -42,3 +42,6 @@ tmp/
 
 # Local sprint handovers
 docs-learning-private/
+
+# Local AI/agent working context
+.agent-private/

@@ -176,3 +176,21 @@ The current release does not include:
 - admin tooling.
 
 A later version may add selected capabilities when they support a clear user need and fit the product’s calm interaction model.
+
+## MVP2 direction
+
+The exclusions above describe the **current release**.
+
+A later MVP2 has accepted architecture decisions for authenticated user-owned persistence, historical action and friction data, and limited weekly and monthly reflection.
+
+None of those capabilities are implemented in the current release.
+
+The accepted direction is documented in:
+
+- [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md)
+- [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
+- [ADR-005: Deterministic Reflection History](../../decisions/ADR-005-deterministic-reflection-history.md)
+
+MVP2 does not change the product boundary.
+
+It is intended to help Fenéla remember relevant user-owned history and support gradual development of routines the user has chosen themselves. It is not intended to add general productivity management, performance scoring or psychological profiling.

@@ -14,7 +14,11 @@ Using Fenéla on another device, in another browser or in another browser profil
 
 Push subscriptions also remain device-specific.
 
-Optional account synchronization would require a separate privacy and architecture decision.
+MVP2 now has an accepted architecture decision for authenticated, user-owned persistence.
+
+That work is not implemented in the current release, so the limitations above still apply to the application today.
+
+See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md).
 
 ## Push notifications
 
@@ -73,7 +77,11 @@ Public AI and reminder routes use validation and rate limiting to reduce repeate
 
 These controls are not identity verification and do not fully prevent deliberate abuse.
 
-Stronger protection would require authentication or a separate abuse-prevention design.
+MVP2 will introduce authenticated ownership for persistent user and reminder data, but that architecture is not implemented in the current release.
+
+Rate limiting and other abuse controls will remain separate from authentication where they still serve a different purpose.
+
+See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md) and [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md).
 
 ## AI and safety limits
 

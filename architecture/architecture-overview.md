@@ -301,6 +301,22 @@ Accounts are not required for the current core loop. They are not ruled out for 
 
 Introducing accounts would require a separate product and architecture decision because it changes the data, privacy and security model.
 
+### Accepted MVP2 identity and persistence direction
+
+The current release still has no user accounts and remains browser- and device-based.
+
+For MVP2, a separate architecture decision has now been accepted: persistent personal history will belong to an authenticated user rather than to a browser-generated device identity.
+
+The accepted MVP2 baseline uses Supabase Auth with PostgreSQL for user-owned persistence.
+
+This is a planned architecture change and is **not implemented in the current release**.
+
+See:
+
+- [ADR-003: Authenticated User-Owned Persistence](../decisions/ADR-003-authenticated-user-owned-persistence.md)
+- [ADR-004: Reminder Preferences and Device Ownership](../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
+- [ADR-005: Deterministic Reflection History](../decisions/ADR-005-deterministic-reflection-history.md)
+
 ### Safety and validation
 
 Safety controls are split across several layers:
@@ -318,17 +334,30 @@ The AI-specific limits are documented in [AI and ethical-use guardrails](../docs
 
 ## Future architecture decisions
 
-Accounts, cross-device synchronization, persisted reflection data or long-term insights would change the current identity, storage and privacy model.
+MVP2 now has accepted architecture decisions for:
 
-These capabilities are not excluded, but each requires a separate product and architecture decision covering:
+- authenticated user-owned persistence;
+- reminder preferences separated from device and push delivery;
+- persistent action and friction history;
+- deterministic weekly and monthly reflection facts;
+- optional bounded AI wording on top of those facts.
 
-- identity and authorization;
-- data retention and deletion;
-- synchronization and migration;
-- privacy and user control;
-- client and server state.
+These decisions are documented in ADR-003 through ADR-005.
 
-The user experience must remain calm and focused even if the supporting architecture grows.
+They are **not implemented in the current release**.
+
+Several implementation details still need to be resolved before MVP2 is complete, including:
+
+- the final relational schema;
+- retention periods;
+- account deletion behavior;
+- exact timezone and calendar-boundary behavior;
+- multi-device reminder behavior;
+- data-access boundaries in the application code.
+
+These details should be decided when the implementation reaches the relevant responsibility rather than being abstracted in advance.
+
+The product boundary remains unchanged: Fenéla should stay calm, small and focused even as persistence and ownership become more explicit.
 
 ## Scope boundary
 
