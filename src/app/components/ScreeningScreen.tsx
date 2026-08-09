@@ -238,6 +238,10 @@ export default function ScreeningScreen({ onDone }: Props) {
         <p className="mt-2 text-sm opacity-80">
           These choices help Fenéla stay small, calm and useful.
         </p>
+        <p className="mt-2 text-sm opacity-80">
+          Fenéla helps you turn one goal into small, concrete steps (&quot;anchors&quot;) and
+          focuses on one at a time.
+        </p>
 
         {warning ? (
           <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">

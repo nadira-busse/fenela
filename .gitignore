@@ -42,7 +42,3 @@ tmp/
 
 # Local sprint handovers
 docs-learning-private/
-
-
-# Local maintenance scripts
-remove-bom.ps1
