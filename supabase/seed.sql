@@ -1,0 +1,6 @@
+-- Fenéla MVP2 — local development seed data.
+--
+-- Intentionally empty for Phase 3C-1 (schema/RLS foundation only).
+-- No onboarding migration and no synthetic fixtures are added yet; add
+-- them here only when a later phase has a concrete need (e.g. RLS
+-- ownership tests run via `supabase test db`).

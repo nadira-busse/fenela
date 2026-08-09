@@ -50,13 +50,13 @@ They do not turn the application into a general event-sourced architecture.
 Weekly and monthly reflections will follow this boundary:
 
 stored history
-        ↓
+↓
 deterministic aggregation
-        ↓
+↓
 structured reflection facts
-        ↓
+↓
 optional AI wording
-        ↓
+↓
 validated output or fallback
 
 The AI model will not be the source of truth for:

@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "supabase/.temp/**",
   ]),
   {
     // These two screens deliberately read localStorage in a useEffect and

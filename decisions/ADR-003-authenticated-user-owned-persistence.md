@@ -53,12 +53,12 @@ User
 ├── UserPreference
 ├── ReminderPreference
 ├── Goal
-│   ├── Anchor
-│   ├── ActionEvent
-│   └── FrictionEvent
+│ ├── Anchor
+│ ├── ActionEvent
+│ └── FrictionEvent
 ├── Reflection
 └── Device
-    └── PushSubscription
+└── PushSubscription
 
 This is a conceptual domain model, not a fixed database schema.
 

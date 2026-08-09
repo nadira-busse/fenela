@@ -127,6 +127,78 @@ After `npm run build`, the output should include the root page and the productio
 
 No development-only, test or obsolete API routes should appear.
 
+## 7. Supabase persistence foundation (MVP2, schema only)
+
+MVP2 introduces authenticated, user-owned persistence on Supabase (Auth + PostgreSQL). The current repository state adds only the schema/RLS foundation described in [ADR-003](../../decisions/ADR-003-authenticated-user-owned-persistence.md), [ADR-004](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md) and [ADR-005](../../decisions/ADR-005-deterministic-reflection-history.md). No application code reads or writes this schema yet.
+
+### Prerequisites
+
+- Docker Desktop (or Podman) running locally — the Supabase CLI's local development stack requires it.
+- No global install is required. Every command below runs through `npx supabase`.
+
+### Configuration
+
+Reproducible Supabase project configuration lives in:
+
+```text
+supabase/
+├── config.toml
+├── seed.sql
+└── migrations/
+    └── 20260809120000_mvp2_persistence_foundation.sql
+```
+
+Add these values to `.env.local` once a Supabase project (local or hosted) exists:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Both are browser-safe values. No server-side service-role key is required yet — this phase does not add any server code that calls Supabase. A service-role key must never be exposed through a `NEXT_PUBLIC_` variable.
+
+### Start the local stack and apply migrations
+
+```bash
+npx supabase start
+npx supabase db reset
+```
+
+`supabase db reset` (re)applies every migration in `supabase/migrations/` against the local database and then runs `supabase/seed.sql`. Treat the migrations directory as the source of truth for the schema — do not hand-configure equivalent state only in the Supabase dashboard.
+
+### Generate TypeScript database types
+
+```bash
+npm run db:types
+```
+
+This runs `npx supabase gen types typescript --local` and writes `src/types/database.types.ts`. Regenerate after every schema migration. These are infrastructure types; application components are not expected to depend on them until a later MVP2 phase adds an actual data-access layer.
+
+### Validate schema and Row Level Security manually
+
+With the local stack running:
+
+```bash
+npx supabase db lint
+```
+
+To check ownership scoping by hand, open a `psql` session against the local database (`npx supabase status` prints the connection string) and simulate two different authenticated users:
+
+```sql
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', '<user-a-uuid>')::text, true);
+-- run SELECT/INSERT statements as user A
+
+select set_config('request.jwt.claims', json_build_object('sub', '<user-b-uuid>')::text, true);
+-- confirm user A's rows are not visible or writable as user B
+```
+
+Use synthetic `auth.users` rows for this. Never test against real account data.
+
+### Environment note
+
+This repository's automated development environment does not have Docker (or Podman) installed, so `npx supabase start` cannot run there and the migration has not been applied against a live database in that environment. Validate it locally with Docker available before relying on it.
+
 ## Optional features
 
 ### AI assistance

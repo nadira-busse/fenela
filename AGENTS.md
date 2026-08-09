@@ -20,27 +20,27 @@ Do not turn Fenéla into a general productivity platform, therapy application, c
 
 Prefer solutions that improve:
 
-* product clarity;
-* simplicity;
-* maintainability;
-* deterministic behavior;
-* testability;
-* traceability;
-* explicit ownership;
-* privacy;
-* accessibility;
-* low cognitive load.
+- product clarity;
+- simplicity;
+- maintainability;
+- deterministic behavior;
+- testability;
+- traceability;
+- explicit ownership;
+- privacy;
+- accessibility;
+- low cognitive load.
 
 Avoid:
 
-* unnecessary abstraction;
-* premature generalization;
-* feature creep;
-* hidden state;
-* vague AI behavior;
-* unnecessary dependencies;
-* technology added only for architectural appearance;
-* broad refactors without a concrete problem.
+- unnecessary abstraction;
+- premature generalization;
+- feature creep;
+- hidden state;
+- vague AI behavior;
+- unnecessary dependencies;
+- technology added only for architectural appearance;
+- broad refactors without a concrete problem.
 
 A working simple solution is preferable to a more sophisticated architecture that does not solve a current requirement.
 
@@ -63,22 +63,22 @@ MVP2 extends this with persistent continuity and limited reflection, but the cor
 
 Do not introduce without explicit approval:
 
-* project management;
-* kanban;
-* generic task lists;
-* calendar planning;
-* time tracking;
-* productivity scoring;
-* performance percentages;
-* leaderboards;
-* competitive gamification;
-* complex dashboards;
-* general journaling;
-* generic chat;
-* psychological profiling;
-* diagnoses;
-* hidden personality models;
-* broad life coaching.
+- project management;
+- kanban;
+- generic task lists;
+- calendar planning;
+- time tracking;
+- productivity scoring;
+- performance percentages;
+- leaderboards;
+- competitive gamification;
+- complex dashboards;
+- general journaling;
+- generic chat;
+- psychological profiling;
+- diagnoses;
+- hidden personality models;
+- broad life coaching.
 
 Weekly and monthly reflection must remain short and supportive.
 
@@ -94,13 +94,13 @@ MVP1 intentionally used a relatively simple local-first architecture.
 
 MVP2 is a separate architectural evolution toward:
 
-* authenticated users;
-* user-owned persistence;
-* historical action data;
-* friction history;
-* weekly reflection;
-* monthly reflection;
-* stronger reminder ownership.
+- authenticated users;
+- user-owned persistence;
+- historical action data;
+- friction history;
+- weekly reflection;
+- monthly reflection;
+- stronger reminder ownership.
 
 Do not retroactively treat MVP1 architecture as an error.
 
@@ -116,11 +116,11 @@ Before modifying a subsystem, read the relevant existing implementation and docu
 
 At minimum:
 
-* inspect the files directly involved;
-* locate related types;
-* locate related tests;
-* locate relevant documentation;
-* inspect existing ADRs when the change touches an architectural decision.
+- inspect the files directly involved;
+- locate related types;
+- locate related tests;
+- locate relevant documentation;
+- inspect existing ADRs when the change touches an architectural decision.
 
 Do not infer behavior from filenames or comments when executable code can establish the actual behavior.
 
@@ -165,14 +165,14 @@ Prefer explicit system boundaries over implicit behavior.
 
 Relevant engineering principles include:
 
-* separation of concerns;
-* deterministic business logic;
-* explicit ownership;
-* idempotency where retries can duplicate effects;
-* failure-safe behavior;
-* minimal dependencies;
-* predictable data flow;
-* testable interfaces.
+- separation of concerns;
+- deterministic business logic;
+- explicit ownership;
+- idempotency where retries can duplicate effects;
+- failure-safe behavior;
+- minimal dependencies;
+- predictable data flow;
+- testable interfaces.
 
 Do not add abstraction before multiple concrete responsibilities justify it.
 
@@ -184,20 +184,20 @@ Keep browser/UI concerns separate from persistent domain and security responsibi
 
 Client-side state may contain:
 
-* temporary form state;
-* presentation state;
-* loading state;
-* unsaved input;
-* short-lived optimistic UI state.
+- temporary form state;
+- presentation state;
+- loading state;
+- unsaved input;
+- short-lived optimistic UI state.
 
 Persistent user-owned state must not rely solely on browser storage when it is required for:
 
-* account continuity;
-* recovery;
-* weekly reflection;
-* monthly reflection;
-* ownership;
-* historical accuracy.
+- account continuity;
+- recovery;
+- weekly reflection;
+- monthly reflection;
+- ownership;
+- historical accuracy.
 
 Security-sensitive identity and authorization decisions belong on the server or in the database security layer.
 
@@ -242,6 +242,7 @@ Expected conceptual relationships include:
 ```text
 User
 ├── UserPreference
+├── ReminderPreference
 ├── Goal
 │   ├── Anchor
 │   │   └── ActionEvent
@@ -257,12 +258,12 @@ Validate each entity against actual product requirements before implementation.
 
 Use:
 
-* foreign keys;
-* appropriate nullability;
-* uniqueness constraints;
-* indexes based on actual access patterns;
-* explicit deletion behavior;
-* version-controlled migrations.
+- foreign keys;
+- appropriate nullability;
+- uniqueness constraints;
+- indexes based on actual access patterns;
+- explicit deletion behavior;
+- version-controlled migrations.
 
 Do not rely on manually configured production-only database state.
 
@@ -276,10 +277,10 @@ Start with the smallest maintainable typed data-access approach.
 
 Introduce an ORM only when a demonstrated current problem justifies it, such as:
 
-* excessive query boilerplate;
-* difficult domain mapping;
-* transaction complexity;
-* significant query composition problems.
+- excessive query boilerplate;
+- difficult domain mapping;
+- transaction complexity;
+- significant query composition problems.
 
 Do not add an ORM simply because PostgreSQL is present.
 
@@ -289,19 +290,19 @@ Do not add an ORM simply because PostgreSQL is present.
 
 MVP2 may store structured historical records such as:
 
-* completed action;
-* postponed action;
-* skipped action;
-* user-entered friction.
+- completed action;
+- postponed action;
+- skipped action;
+- user-entered friction.
 
 This does not make Fenéla an event-sourced system.
 
 Do not introduce:
 
-* CQRS;
-* event buses;
-* projection frameworks;
-* generalized event-sourcing infrastructure;
+- CQRS;
+- event buses;
+- projection frameworks;
+- generalized event-sourcing infrastructure;
 
 unless a later concrete requirement requires them.
 
@@ -317,12 +318,12 @@ Fenéla must not ask users for information it cannot explain how it uses.
 
 For every collected input, be able to answer:
 
-* Why is this asked?
-* What behavior does it influence?
-* Does it need persistence?
-* Which domain concept owns it?
-* Does AI need access to it?
-* How long should it exist?
+- Why is this asked?
+- What behavior does it influence?
+- Does it need persistence?
+- Which domain concept owns it?
+- Does AI need access to it?
+- How long should it exist?
 
 If no meaningful use exists, prefer removing the question rather than storing unused personal data.
 
@@ -336,10 +337,10 @@ User-entered friction must be treated as the user's own explanation of a specifi
 
 It may support:
 
-* weekly reflection;
-* monthly reflection;
-* adjustment of future anchors;
-* factual identification of repeated in-app situations.
+- weekly reflection;
+- monthly reflection;
+- adjustment of future anchors;
+- factual identification of repeated in-app situations.
 
 Do not transform this into psychological profiling.
 
@@ -379,12 +380,12 @@ fallback when required
 
 The AI model is not the source of truth for:
 
-* counts;
-* completion status;
-* date ranges;
-* event history;
-* ownership;
-* routine progress facts.
+- counts;
+- completion status;
+- date ranges;
+- event history;
+- ownership;
+- routine progress facts.
 
 Weekly reflection supports small short-term adjustment.
 
@@ -402,21 +403,21 @@ Use deterministic application logic whenever exact behavior is required.
 
 AI may assist with:
 
-* anchor suggestions;
-* structured-output repair where already justified;
-* human-readable wording based on validated facts.
+- anchor suggestions;
+- structured-output repair where already justified;
+- human-readable wording based on validated facts.
 
 AI must not control:
 
-* authentication;
-* authorization;
-* persistence truth;
-* ownership;
-* event state;
-* date calculations;
-* exact counts;
-* deletion;
-* security decisions.
+- authentication;
+- authorization;
+- persistence truth;
+- ownership;
+- event state;
+- date calculations;
+- exact counts;
+- deletion;
+- security decisions.
 
 Minimize the personal context sent to AI providers.
 
@@ -432,20 +433,20 @@ Treat all persistent personal data as intentional product data with an explicit 
 
 Apply:
 
-* data minimization;
-* purpose limitation;
-* clear ownership;
-* appropriate retention;
-* user control;
-* secure handling.
+- data minimization;
+- purpose limitation;
+- clear ownership;
+- appropriate retention;
+- user control;
+- secure handling.
 
 Do not expose:
 
-* secrets;
-* service-role keys;
-* tokens;
-* credentials;
-* private environment values;
+- secrets;
+- service-role keys;
+- tokens;
+- credentials;
+- private environment values;
 
 to client-side code or the public repository.
 
@@ -483,12 +484,12 @@ Weekly and monthly aggregation, day boundaries and reminder scheduling must not 
 
 When modifying date/time behavior, define:
 
-* authoritative user timezone;
-* day boundary;
-* week boundary;
-* month boundary;
-* DST behavior;
-* stored timestamp convention.
+- authoritative user timezone;
+- day boundary;
+- week boundary;
+- month boundary;
+- DST behavior;
+- stored timestamp convention.
 
 Prefer storing absolute timestamps consistently and applying user timezone deliberately when deriving user-facing periods.
 
@@ -522,14 +523,14 @@ Do not silently lose important user state.
 
 Explicitly handle relevant failure modes, including:
 
-* authentication failure;
-* expired session;
-* authorization denial;
-* database read/write failure;
-* duplicate operation;
-* reminder failure;
-* expired push subscription;
-* AI failure.
+- authentication failure;
+- expired session;
+- authorization denial;
+- database read/write failure;
+- duplicate operation;
+- reminder failure;
+- expired push subscription;
+- AI failure.
 
 UI success state must not imply persistence succeeded when it did not.
 
@@ -543,11 +544,11 @@ Do not intentionally disable standard browser accessibility features without a d
 
 Preserve:
 
-* text scaling;
-* pinch-to-zoom;
-* keyboard accessibility;
-* meaningful labels;
-* sufficient interaction clarity.
+- text scaling;
+- pinch-to-zoom;
+- keyboard accessibility;
+- meaningful labels;
+- sufficient interaction clarity.
 
 When modifying UI, consider the product context:
 
@@ -563,15 +564,15 @@ Testing must follow risk, not arbitrary coverage targets.
 
 Prioritize:
 
-* authentication;
-* authorization;
-* cross-user isolation;
-* persistence;
-* duplicate writes;
-* reminder ownership;
-* deterministic reflection facts;
-* failure paths;
-* privacy/security boundaries.
+- authentication;
+- authorization;
+- cross-user isolation;
+- persistence;
+- duplicate writes;
+- reminder ownership;
+- deterministic reflection facts;
+- failure paths;
+- privacy/security boundaries.
 
 For deterministic logic:
 
@@ -603,9 +604,9 @@ internal documentation link check
 
 If a required command cannot run because of the environment:
 
-* report the exact command;
-* report the exact failure;
-* distinguish environment failure from code failure.
+- report the exact command;
+- report the exact failure;
+- distinguish environment failure from code failure.
 
 Do not claim a check passed if it was not actually executed successfully.
 
@@ -621,12 +622,12 @@ Keep claims aligned with implementation.
 
 Use precise status language:
 
-* implemented;
-* tested;
-* manually verified;
-* designed;
-* planned;
-* not implemented.
+- implemented;
+- tested;
+- manually verified;
+- designed;
+- planned;
+- not implemented.
 
 Do not describe future MVP2 functionality as current behavior.
 
@@ -644,11 +645,11 @@ Use ADRs for meaningful architectural decisions, not routine code changes.
 
 An ADR should normally record:
 
-* context;
-* decision;
-* reason;
-* trade-off;
-* impact.
+- context;
+- decision;
+- reason;
+- trade-off;
+- impact.
 
 Before changing an accepted architectural decision:
 
@@ -664,30 +665,30 @@ Do not silently contradict an accepted ADR.
 
 Assume every committed file is visible to:
 
-* developers;
-* hiring managers;
-* recruiters;
-* other users.
+- developers;
+- hiring managers;
+- recruiters;
+- other users.
 
 Keep the repository:
 
-* understandable;
-* reproducible;
-* professional;
-* free of private data;
-* free of stale local tooling;
-* free of generated junk;
-* free of unnecessary files.
+- understandable;
+- reproducible;
+- professional;
+- free of private data;
+- free of stale local tooling;
+- free of generated junk;
+- free of unnecessary files.
 
 Do not commit:
 
-* `.env`;
-* credentials;
-* local private files;
-* debug dumps;
-* temporary exports;
-* secrets;
-* machine-specific artifacts.
+- `.env`;
+- credentials;
+- local private files;
+- debug dumps;
+- temporary exports;
+- secrets;
+- machine-specific artifacts.
 
 Respect `.gitignore`, but also verify that previously tracked files are appropriate for publication.
 
@@ -732,10 +733,10 @@ Do not add an npm package when the platform or existing dependencies already pro
 
 Before adding a dependency, explain:
 
-* what problem it solves;
-* why existing tools are insufficient;
-* maintenance/security cost;
-* whether it is necessary now.
+- what problem it solves;
+- why existing tools are insufficient;
+- maintenance/security cost;
+- whether it is necessary now.
 
 Remove unused dependencies when their removal is within task scope and safe.
 
@@ -749,12 +750,12 @@ Refactor when a file contains multiple meaningful responsibilities that should e
 
 Good reasons include separating:
 
-* UI rendering;
-* persistence;
-* reminder orchestration;
-* authorization;
-* reflection aggregation;
-* domain rules.
+- UI rendering;
+- persistence;
+- reminder orchestration;
+- authorization;
+- reflection aggregation;
+- domain rules.
 
 Bad reason:
 
@@ -810,10 +811,10 @@ State any material assumption required to complete the task.
 
 Do not claim:
 
-* tests passed when they were not run;
-* runtime behavior was manually verified when it was not;
-* future work is implemented;
-* an assumption is a fact.
+- tests passed when they were not run;
+- runtime behavior was manually verified when it was not;
+- future work is implemented;
+- an assumption is a fact.
 
 ---
 

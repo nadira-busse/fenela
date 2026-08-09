@@ -317,6 +317,8 @@ See:
 - [ADR-004: Reminder Preferences and Device Ownership](../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
 - [ADR-005: Deterministic Reflection History](../decisions/ADR-005-deterministic-reflection-history.md)
 
+A version-controlled schema/RLS foundation for this domain model now exists under `supabase/migrations/`. It is infrastructure only: no authentication UI, onboarding integration or runtime persistence has been added, and no application code depends on it yet. See [Local setup](../docs/technical/local-setup.md) for how to run it.
+
 ### Safety and validation
 
 Safety controls are split across several layers:

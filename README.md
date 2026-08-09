@@ -150,16 +150,18 @@ The application requires environment variables for optional AI, Web Push, storag
 
 ## Environment variables
 
-| Variable                    | Purpose                                                   |
-| --------------------------- | --------------------------------------------------------- |
-| `OPENAI_API_KEY`            | Enables optional AI-assisted anchor generation            |
-| `OPENAI_MODEL`              | Defines the OpenAI model used by the app                  |
-| `WEB_PUSH_PUBLIC_KEY`       | Public VAPID key for browser push subscriptions           |
-| `WEB_PUSH_PRIVATE_KEY`      | Private VAPID key for sending push notifications          |
-| `WEB_PUSH_SUBJECT`          | Contact subject used for VAPID configuration              |
-| `STORAGE_KV_REST_API_URL`   | Storage endpoint for reminder and job data                |
-| `STORAGE_KV_REST_API_TOKEN` | Token for KV-compatible storage access                    |
-| `CRON_SECRET`               | Shared secret used to protect the cron-triggered endpoint |
+| Variable                               | Purpose                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | MVP2 persistence foundation (schema/RLS only; not yet used by the app) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | MVP2 persistence foundation (schema/RLS only; not yet used by the app) |
+| `OPENAI_API_KEY`                       | Enables optional AI-assisted anchor generation                         |
+| `OPENAI_MODEL`                         | Defines the OpenAI model used by the app                               |
+| `WEB_PUSH_PUBLIC_KEY`                  | Public VAPID key for browser push subscriptions                        |
+| `WEB_PUSH_PRIVATE_KEY`                 | Private VAPID key for sending push notifications                       |
+| `WEB_PUSH_SUBJECT`                     | Contact subject used for VAPID configuration                           |
+| `STORAGE_KV_REST_API_URL`              | Storage endpoint for reminder and job data                             |
+| `STORAGE_KV_REST_API_TOKEN`            | Token for KV-compatible storage access                                 |
+| `CRON_SECRET`                          | Shared secret used to protect the cron-triggered endpoint              |
 
 When connecting a new Upstash or Vercel KV database through an integration, the generated variable names may not match the names used by Fenéla. Fenéla expects the `STORAGE_KV_*` names above.
 
