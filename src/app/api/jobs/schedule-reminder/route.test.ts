@@ -28,6 +28,13 @@ vi.mock("@/lib/rateLimit", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
 }));
 
+// These existing tests exercise the unauthenticated/legacy path (Phase 4D
+// §9 added authenticated Device ownership verification on top, unchanged
+// for anonymous callers).
+vi.mock("@/server/auth/requireUser", () => ({
+  getOptionalUser: vi.fn().mockResolvedValue(null),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {

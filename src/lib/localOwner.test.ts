@@ -18,7 +18,14 @@ vi.mock("@/lib/storage", () => ({
   },
 }));
 
-const { ensureLocalOwnership, OWNER_MARKER_KEY, OWNED_STORAGE_KEYS } = await import("./localOwner");
+vi.mock("@/lib/device", () => ({ DEVICE_ID_KEY: "fenela_device_id" }));
+vi.mock("@/lib/reminderLocalKeys", () => ({
+  DAILY_REMINDER_TIME_KEY: "fenela:dailyReminder:startTime",
+  DAILY_REMINDERS_ENABLED_KEY: "fenela:dailyReminder:enabled",
+}));
+
+const { ensureLocalOwnership, clearLocalStateForSignOut, OWNER_MARKER_KEY, OWNED_STORAGE_KEYS } =
+  await import("./localOwner");
 
 const USER_A = "user-a-11111111-1111-1111-1111-111111111111";
 const USER_B = "user-b-22222222-2222-2222-2222-222222222222";
@@ -89,5 +96,61 @@ describe("ensureLocalOwnership", () => {
 
     expect(store.get("fenela_device_id")).toBe("some-device-id");
     expect(store.get("fenela:dailyReminder:startTime")).toBe("08:00");
+  });
+});
+
+describe("clearLocalStateForSignOut", () => {
+  beforeEach(() => {
+    store.clear();
+  });
+
+  function seedFullSignedInState() {
+    store.set(OWNER_MARKER_KEY, USER_A);
+    seedOwnedState();
+    store.set("fenela_device_id", "some-device-id");
+    store.set("fenela:dailyReminder:startTime", "07:15");
+    store.set("fenela:dailyReminder:enabled", "true");
+  }
+
+  it("removes all authenticated personal-compatibility keys", () => {
+    seedFullSignedInState();
+
+    clearLocalStateForSignOut();
+
+    for (const key of OWNED_STORAGE_KEYS) {
+      expect(store.has(key)).toBe(false);
+    }
+  });
+
+  it("removes the owner marker", () => {
+    seedFullSignedInState();
+
+    clearLocalStateForSignOut();
+
+    expect(store.has(OWNER_MARKER_KEY)).toBe(false);
+  });
+
+  it("removes the device id and reminder-local cache", () => {
+    seedFullSignedInState();
+
+    clearLocalStateForSignOut();
+
+    expect(store.has("fenela_device_id")).toBe(false);
+    expect(store.has("fenela:dailyReminder:startTime")).toBe(false);
+    expect(store.has("fenela:dailyReminder:enabled")).toBe(false);
+  });
+
+  it("preserves unrelated keys", () => {
+    seedFullSignedInState();
+    store.set("some:unrelated:key", "keep-me");
+
+    clearLocalStateForSignOut();
+
+    expect(store.get("some:unrelated:key")).toBe("keep-me");
+  });
+
+  it("is safe to call when nothing is stored yet (no localStorage.clear() side effects)", () => {
+    expect(() => clearLocalStateForSignOut()).not.toThrow();
+    expect(store.size).toBe(0);
   });
 });

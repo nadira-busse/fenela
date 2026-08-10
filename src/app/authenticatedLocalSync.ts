@@ -1,6 +1,7 @@
 // Orchestrates the sequence HomeClient must run, in order, on every
 // authenticated load, before any owned local key is read for rendering
-// (Phase 4A hardening, Defect A; extended in Phase 4B for Goal/Anchors):
+// (Phase 4A hardening, Defect A; extended in Phase 4B for Goal/Anchors and
+// Phase 4D for ReminderPreference):
 //
 //   1. local owner check — discard foreign/unowned compatibility state
 //   2. DB user_preferences → refreshed local screening compatibility cache
@@ -13,7 +14,7 @@
 
 import { saveToStorage, removeFromStorage, CARE_ANCHORS_KEY } from "@/lib/storage";
 import { ensureLocalOwnership } from "@/lib/localOwner";
-import { loadScreening, saveScreening, type ScreeningInput } from "@/lib/screeningStorage";
+import { saveScreening, type ScreeningInput } from "@/lib/screeningStorage";
 import { mapActiveGoalToCompatibilityState, type ActiveGoalWithAnchors } from "@/lib/goalMapping";
 
 export const LS_SCREENING_DONE_KEY = "fenela:screeningDone";
@@ -21,20 +22,27 @@ export const LS_INTAKE_KEY = "fenela:intake";
 
 export type PersistedPreferenceFields = Omit<ScreeningInput, "dailyReminder" | "startTime">;
 
+export type PersistedReminderPreference = { enabled: boolean; startTime: string };
+
 export function syncAuthenticatedLocalState(
   userId: string,
   dbPreference: PersistedPreferenceFields | null,
-  activeGoal: ActiveGoalWithAnchors | null
+  activeGoal: ActiveGoalWithAnchors | null,
+  reminderPreference: PersistedReminderPreference | null = null
 ): void {
   ensureLocalOwnership(userId);
 
   if (dbPreference) {
-    const existingLocal = loadScreening();
-
+    // ReminderPreference (reminder_preferences) is now the sole canonical
+    // source for dailyReminder/startTime (Phase 4D, ADR-004) — no longer
+    // preserved from whatever the local screening cache happened to hold,
+    // since that was the exact "two independent sources" duplication this
+    // phase removes. No row yet means the product default (not enabled),
+    // never an inferred value from an old anonymous cache (Phase 4D §25).
     saveScreening({
       ...dbPreference,
-      dailyReminder: existingLocal?.dailyReminder ?? "NOT_NOW",
-      startTime: existingLocal?.startTime ?? "08:00",
+      dailyReminder: reminderPreference?.enabled ? "YES" : "NOT_NOW",
+      startTime: reminderPreference?.startTime ?? "08:00",
     });
 
     saveToStorage(LS_SCREENING_DONE_KEY, true);

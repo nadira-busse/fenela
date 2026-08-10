@@ -90,7 +90,7 @@ describe("syncAuthenticatedLocalState", () => {
     expect(fakeLocalStorage._store.has(LS_SCREENING_DONE_KEY)).toBe(false);
   });
 
-  it("preserves the same owner's local-only reminder fields while refreshing canonical fields from the DB", () => {
+  it("uses the canonical DB reminder preference for dailyReminder/startTime, not a stale local-only value (Phase 4D, ADR-004)", () => {
     fakeLocalStorage._store.set(OWNER_MARKER_KEY, JSON.stringify(USER_A));
     fakeLocalStorage._store.set(
       "fenela:screening:v1",
@@ -109,12 +109,41 @@ describe("syncAuthenticatedLocalState", () => {
       })
     );
 
-    syncAuthenticatedLocalState(USER_A, dbPreference, null);
+    syncAuthenticatedLocalState(USER_A, dbPreference, null, {
+      enabled: false,
+      startTime: "09:30",
+    });
 
     const screening = JSON.parse(fakeLocalStorage._store.get("fenela:screening:v1")!);
     expect(screening.name).toBe("Nadira"); // refreshed from DB
-    expect(screening.dailyReminder).toBe("YES"); // preserved local-only field
-    expect(screening.startTime).toBe("07:15"); // preserved local-only field
+    expect(screening.dailyReminder).toBe("NOT_NOW"); // from the canonical reminder preference, not the stale local "YES"
+    expect(screening.startTime).toBe("09:30"); // from the canonical reminder preference, not the stale local "07:15"
+  });
+
+  it("defaults dailyReminder/startTime when no reminder preference row exists yet, ignoring any stale local value (Phase 4D §25)", () => {
+    fakeLocalStorage._store.set(OWNER_MARKER_KEY, JSON.stringify(USER_A));
+    fakeLocalStorage._store.set(
+      "fenela:screening:v1",
+      JSON.stringify({
+        version: 1,
+        createdAtIso: "2026-01-01T00:00:00.000Z",
+        name: "Old name",
+        mode: "I_DECIDE",
+        dailyReminder: "YES",
+        startTime: "07:15",
+        resistancePattern: "DELAY",
+        mainChallenge: "START",
+        actionTrigger: "SMALL",
+        antiHelp: [],
+        guidanceProfile: {},
+      })
+    );
+
+    syncAuthenticatedLocalState(USER_A, dbPreference, null, null);
+
+    const screening = JSON.parse(fakeLocalStorage._store.get("fenela:screening:v1")!);
+    expect(screening.dailyReminder).toBe("NOT_NOW");
+    expect(screening.startTime).toBe("08:00");
   });
 
   it("clears every owned key for a different owner, not just the ones a caller happened to seed", () => {

@@ -1,0 +1,30 @@
+-- Fenéla MVP2 — Phase 4D hardening: service_role grants for the privileged
+-- push_subscriptions cleanup path.
+--
+-- supabase/migrations/20260809120000_mvp2_persistence_foundation.sql assumed
+-- service_role needed no explicit table grants because it "bypasses RLS and
+-- table grants entirely." That is only half true: BYPASSRLS lets service_role
+-- skip Row Level Security policy evaluation, but standard SQL GRANT/REVOKE
+-- table privileges are still enforced for every role, service_role included.
+-- That migration's `revoke all ... from public, anon` never granted
+-- service_role anything on push_subscriptions in the first place (confirmed
+-- via information_schema.role_table_grants against the local database:
+-- service_role had only TRUNCATE/REFERENCES/TRIGGER, not SELECT/DELETE).
+--
+-- This is a proven defect, not a hypothetical one: the privileged admin
+-- client this phase introduces (src/lib/supabase/adminClient.ts,
+-- SUPABASE_SECRET_KEY) exists for exactly one job — deleting a
+-- terminal-invalid PushSubscription during cron cleanup
+-- (src/server/devices/deletePushSubscriptionByDeviceId.ts) — and running
+-- that exact operation against the real local database failed with
+-- "permission denied for table push_subscriptions" until this grant was
+-- added.
+--
+-- Scoped to exactly the one table and the two operations
+-- (read-to-confirm-idempotency, delete) this cleanup path needs. Not
+-- extended to devices/reminder_preferences/user_preferences/goals/anything
+-- else — none of that data is ever touched by this cleanup, and it must
+-- stay that way (AGENTS.md §5/§12: smallest correct solution, no
+-- speculative privilege grants).
+
+grant select, delete on public.push_subscriptions to service_role;

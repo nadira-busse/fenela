@@ -1,6 +1,6 @@
 // src/lib/pushClient.ts
 
-import { getOrCreateDeviceId } from "@/lib/device";
+import { getOrCreateDeviceId, setDeviceId } from "@/lib/device";
 
 export async function ensureServiceWorker() {
   if (!("serviceWorker" in navigator)) {
@@ -85,7 +85,17 @@ export async function saveSubscriptionToServer(sub: PushSubscription) {
     throw new Error(data?.error ?? "Failed to save subscription.");
   }
 
-  return { deviceId, data };
+  // For an authenticated caller, the server may return a different,
+  // ownership-verified device id than the one just sent (Phase 4D §9/§10)
+  // — every subsequent schedule/cancel call must use that one.
+  const effectiveDeviceId =
+    typeof data?.deviceId === "string" && data.deviceId.length > 0 ? data.deviceId : deviceId;
+
+  if (effectiveDeviceId !== deviceId) {
+    setDeviceId(effectiveDeviceId);
+  }
+
+  return { deviceId: effectiveDeviceId, data };
 }
 
 export async function enablePushForCurrentDevice() {

@@ -23,6 +23,7 @@ import {
   LS_SCREENING_DONE_KEY,
   LS_INTAKE_KEY,
   type PersistedPreferenceFields,
+  type PersistedReminderPreference,
 } from "./authenticatedLocalSync";
 import { createAuthenticatedOwnershipStore } from "./authenticatedOwnershipStore";
 import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
@@ -35,6 +36,7 @@ type Props = {
   userId: string | null;
   dbPreference: PersistedPreferenceFields | null;
   activeGoal: ActiveGoalWithAnchors | null;
+  reminderPreference: PersistedReminderPreference | null;
 };
 
 const LEGACY_DAYSTATE_KEY = "anchor:dayState";
@@ -89,7 +91,12 @@ function getOwnershipServerSnapshot() {
   return false;
 }
 
-export default function HomeClient({ userId, dbPreference, activeGoal }: Props) {
+export default function HomeClient({
+  userId,
+  dbPreference,
+  activeGoal,
+  reminderPreference,
+}: Props) {
   const isAuthenticated = userId !== null;
 
   const hydrated = useSyncExternalStore(
@@ -120,8 +127,11 @@ export default function HomeClient({ userId, dbPreference, activeGoal }: Props) 
   const [newGoalError, setNewGoalError] = useState<string | null>(null);
 
   const ownershipStore = useMemo(
-    () => (userId ? createAuthenticatedOwnershipStore(userId, dbPreference, activeGoal) : null),
-    [userId, dbPreference, activeGoal]
+    () =>
+      userId
+        ? createAuthenticatedOwnershipStore(userId, dbPreference, activeGoal, reminderPreference)
+        : null,
+    [userId, dbPreference, activeGoal, reminderPreference]
   );
 
   const ownershipReady = useSyncExternalStore(
@@ -266,6 +276,7 @@ export default function HomeClient({ userId, dbPreference, activeGoal }: Props) 
           key={coachMountKey}
           intake={intake}
           goalId={goalId}
+          reminderPreference={goalId ? reminderPreference : null}
           onResetEverything={resetEverything}
           onRestartDay={restartDay}
           newGoalPending={archivingNewGoal}

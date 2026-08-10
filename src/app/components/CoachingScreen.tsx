@@ -15,10 +15,12 @@ import {
 } from "@/lib/storage";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { enablePushForCurrentDevice, getNotificationPermission } from "@/lib/pushClient";
+import { DAILY_REMINDER_TIME_KEY, DAILY_REMINDERS_ENABLED_KEY } from "@/lib/reminderLocalKeys";
 import { createActionEventAction } from "@/server/events/createActionEventAction";
 import { createFrictionEventAction } from "@/server/events/createFrictionEventAction";
 import type { ActionEventType } from "@/lib/eventMapping";
 import { createPendingEventIdSlot } from "@/lib/pendingEventId";
+import { saveReminderPreferenceAction } from "@/server/reminders/saveReminderPreferenceAction";
 
 type EnhancedCoachState =
   | CoachState
@@ -39,6 +41,12 @@ interface CoachingScreenProps {
   // users only — Phase 4B hardening, Defect A). Undefined for the
   // unauthenticated/local-only MVP1 path.
   goalId?: string;
+  // The canonical DB reminder_preferences row for this authenticated user
+  // (Phase 4D, ADR-004), or null for the unauthenticated/local-only MVP1
+  // path or when no row exists yet. When set, this — not any local
+  // storage cache — is the sole source for the enabled/time state shown
+  // below.
+  reminderPreference?: { enabled: boolean; startTime: string } | null;
   onResetEverything: () => void;
   onRestartDay: () => void;
   // New Goal archive state (Phase 4B hardening, Defect B) — owned by
@@ -67,9 +75,6 @@ type ReminderScreening = {
   startTime?: string;
   dailyReminder?: DailyReminderPreference | boolean;
 };
-
-const DAILY_REMINDER_TIME_KEY = "fenela:dailyReminder:startTime";
-const DAILY_REMINDERS_ENABLED_KEY = "fenela:dailyReminder:enabled";
 
 function getStoredDailyReminderTime(screening: ReminderScreening | null): string {
   if (typeof window === "undefined") return "08:00";
@@ -374,6 +379,7 @@ function ReminderSettingsLink({
 export default function CoachingScreen({
   intake,
   goalId,
+  reminderPreference = null,
   onResetEverything,
   onRestartDay,
   newGoalPending = false,
@@ -462,8 +468,17 @@ export default function CoachingScreen({
       setActiveTasks(freshDay.activeTasks);
     }
 
-    const reminderTime = getStoredDailyReminderTime(screening);
-    const remindersEnabled = getStoredDailyRemindersEnabled(screening);
+    // For authenticated Coaching, reminder_preferences is the sole
+    // canonical source (Phase 4D, ADR-004) — no local storage cache is
+    // consulted, so a stale local value can never override it (Phase 4D
+    // §14/§25). The unauthenticated/local-only MVP1 path is unchanged.
+    const reminderTime = goalId
+      ? (reminderPreference?.startTime ?? "08:00")
+      : getStoredDailyReminderTime(screening);
+
+    const remindersEnabled = goalId
+      ? Boolean(reminderPreference?.enabled)
+      : getStoredDailyRemindersEnabled(screening);
 
     setDailyReminderTime(reminderTime);
     setDraftDailyReminderTime(reminderTime);
@@ -475,7 +490,7 @@ export default function CoachingScreen({
     }
 
     setHydrated(true);
-  }, [todayKey, screening, goalId]);
+  }, [todayKey, screening, goalId, reminderPreference]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -523,9 +538,31 @@ export default function CoachingScreen({
     return data as { jobId?: string; dueAtIso?: string };
   };
 
+  // reminder_preferences is the sole canonical enabled/start_time source
+  // (Phase 4D, ADR-004) — persisted here, before any push/schedule/cancel
+  // side effect, so the DB never contradicts what the UI is about to show
+  // (Phase 4D §7/§16). A no-op for the unauthenticated/local-only MVP1
+  // path (no goalId).
+  const persistReminderPreference = async (enabled: boolean, startTime: string) => {
+    if (!goalId) return true;
+
+    const result = await saveReminderPreferenceAction({ enabled, startTime });
+
+    if (!result.ok) {
+      setReminderActionStatus("error");
+      setReminderMessage(result.message);
+      return false;
+    }
+
+    return true;
+  };
+
   const enableDailyReminders = async () => {
     setReminderActionStatus("saving");
     setReminderMessage(null);
+
+    const persisted = await persistReminderPreference(true, draftDailyReminderTime);
+    if (!persisted) return;
 
     try {
       const pushResult = await enablePushForCurrentDevice();
@@ -573,10 +610,13 @@ export default function CoachingScreen({
   };
 
   const disableDailyReminders = async () => {
-    const deviceId = getOrCreateDeviceId();
-
     setReminderActionStatus("saving");
     setReminderMessage(null);
+
+    const persisted = await persistReminderPreference(false, draftDailyReminderTime);
+    if (!persisted) return;
+
+    const deviceId = getOrCreateDeviceId();
 
     try {
       const res = await fetch("/api/jobs/cancel-daily-start", {
@@ -610,6 +650,12 @@ export default function CoachingScreen({
   const saveDailyReminderTime = async () => {
     setReminderActionStatus("saving");
     setReminderMessage(null);
+
+    const persisted = await persistReminderPreference(
+      dailyRemindersEnabled,
+      draftDailyReminderTime
+    );
+    if (!persisted) return;
 
     if (!dailyRemindersEnabled) {
       saveDailyReminderSettings({ enabled: false, startTime: draftDailyReminderTime });

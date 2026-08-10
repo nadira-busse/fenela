@@ -10,9 +10,10 @@ import {
   ResistancePattern,
   saveScreening,
 } from "@/lib/screeningStorage";
-import { getOrCreateDeviceId } from "@/lib/device";
+import { getOrCreateDeviceId, setDeviceId } from "@/lib/device";
 import { getBrowserTimeZone } from "@/lib/browserTimeZone";
 import { saveUserPreferenceAction } from "@/server/preferences/saveUserPreferenceAction";
+import { saveReminderPreferenceAction } from "@/server/reminders/saveReminderPreferenceAction";
 
 type Props = { onDone: () => void };
 
@@ -53,7 +54,7 @@ async function fetchWebPushPublicKey(): Promise<
 
 async function ensurePushAndSubscribe(
   deviceId: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; deviceId: string } | { ok: false; error: string }> {
   try {
     if (!("serviceWorker" in navigator)) {
       return { ok: false, error: "Service Worker not supported." };
@@ -104,7 +105,18 @@ async function ensurePushAndSubscribe(
       };
     }
 
-    return { ok: true };
+    // For an authenticated caller, the server may return a different,
+    // ownership-verified device id than the one just sent (Phase 4D
+    // §9/§10) — scheduling below must use that one, and the local cache
+    // must be updated so later Coaching reminder settings use it too.
+    const effectiveDeviceId =
+      typeof data?.deviceId === "string" && data.deviceId.length > 0 ? data.deviceId : deviceId;
+
+    if (effectiveDeviceId !== deviceId) {
+      setDeviceId(effectiveDeviceId);
+    }
+
+    return { ok: true, deviceId: effectiveDeviceId };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown push setup error";
     return { ok: false, error: message };
@@ -218,6 +230,25 @@ export default function ScreeningScreen({ onDone }: Props) {
       // values without needing a broader refactor in this phase.
       saveCurrentScreening();
 
+      // ReminderPreference is now the single canonical source for
+      // enabled/start_time (Phase 4D, ADR-004) — saved here regardless of
+      // the choice, including "Not now" (enabled: false), so onboarding
+      // and Coaching's later Reminder Settings always read/write the same
+      // row instead of two independent local values.
+      const reminderPrefResult = await saveReminderPreferenceAction({
+        enabled: dailyReminder === "YES",
+        startTime,
+      });
+
+      if (!reminderPrefResult.ok) {
+        console.warn("Reminder preference save failed:", reminderPrefResult.message);
+        setWarning(
+          "Reminder settings could not be saved right now. Fenéla still works without notifications."
+        );
+        setCanContinueWithoutReminders(true);
+        return;
+      }
+
       if (dailyReminder === "NOT_NOW") {
         onDone();
         return;
@@ -235,7 +266,7 @@ export default function ScreeningScreen({ onDone }: Props) {
         return;
       }
 
-      const schedRes = await scheduleDailyStart(deviceId, startTime);
+      const schedRes = await scheduleDailyStart(subRes.deviceId, startTime);
 
       if (!schedRes.ok) {
         console.warn("Daily reminder scheduling failed:", schedRes.error);

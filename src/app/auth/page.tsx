@@ -1,6 +1,7 @@
 import { requireUser } from "@/server/auth/requireUser";
 import { safeRedirectPath } from "@/lib/auth/safeRedirect";
 import { AuthPanel } from "./AuthPanel";
+import { SignOutButton } from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -47,14 +48,7 @@ export default async function AuthPage({
           <p className="text-sm text-[var(--text-main)]">
             Signed in{user.email ? ` as ${user.email}` : ""}.
           </p>
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="rounded-lg border border-[var(--text-main)]/20 px-4 py-3 text-sm font-medium text-[var(--text-main)]"
-            >
-              Sign out
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       ) : (
         <AuthPanel next={next} />
