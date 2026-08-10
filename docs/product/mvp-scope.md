@@ -87,7 +87,7 @@ For the active anchor, the user can:
 - postpone it;
 - return to it later.
 
-After the second postponement, Fenéla asks what could make the anchor easier to finish. The reflection step is present in the interface, but the response is not yet persisted — doing so would require a separate product, privacy and data-model decision.
+After the second postponement, Fenéla asks what could make the anchor easier to finish. Non-empty user-entered friction is persisted as factual `FrictionEvent` history for authenticated users. It is stored without sentiment analysis, diagnosis or psychological classification.
 
 After the third postponement, Fenéla parks the anchor for the current day rather than continuing to apply pressure.
 
@@ -95,7 +95,7 @@ The current accountability flow does not use scores, streaks or competitive elem
 
 ### 6. Reusing saved anchors
 
-Saved anchors remain available across daily sessions in the same browser or installed PWA.
+For authenticated users, the active Goal and its Anchors are persisted in PostgreSQL and can be restored in later sessions. Browser-local state remains as a compatibility layer for the current UI flow.
 
 The user can:
 
@@ -132,17 +132,11 @@ The app includes the infrastructure required for browser push notifications:
 
 This infrastructure supports reminders but remains separate from the main user flow.
 
-### 9. Local and device-based state
+### 9. Authenticated and device-local state
 
-Screening answers, saved anchors, day state and reminder preferences are stored for the current browser or installed PWA.
+For authenticated users, canonical user preferences, reminder preferences, Goals, Anchors and factual event history are persisted in PostgreSQL and scoped to the authenticated account. Devices and push subscriptions are also account-owned.
 
-The current version does not include:
-
-- user accounts;
-- persistent user profiles;
-- account-based cross-device synchronization.
-
-Adding these capabilities requires a separate product, privacy and architecture decision.
+Some UI/day-state compatibility data remains browser-local. Push subscriptions remain device-specific even though their ownership is authenticated. Full multi-device fanout and account lifecycle features are not part of the current MVP2 implementation.
 
 ### 10. Public documentation
 
@@ -163,8 +157,8 @@ The current release does not include:
 
 - direct editing of an already saved anchor set;
 - manual anchor reordering;
-- persisted responses to the postponement reflection question;
-- user accounts or account-based synchronization;
+- journaling-style free-form reflection history;
+- full multi-device synchronization or fanout;
 - dashboards or extensive progress tracking;
 - journaling;
 - long-term trend analysis;
@@ -177,15 +171,13 @@ The current release does not include:
 
 A later version may add selected capabilities when they support a clear user need and fit the product’s calm interaction model.
 
-## MVP2 direction
+## MVP2 implementation status
 
-The exclusions above describe the **current release**.
+MVP2 is actively implemented in the repository. Authenticated user-owned persistence, historical ActionEvent/FrictionEvent data and reminder/device ownership are implemented and validated in the development branch. Deterministic weekly/monthly reflection persistence is being completed in the current development phase.
 
-A later MVP2 has accepted architecture decisions for authenticated user-owned persistence, historical action and friction data, and limited weekly and monthly reflection.
+The production deployment has not yet been updated to this final MVP2 state.
 
-None of those capabilities are implemented in the current release.
-
-The accepted direction is documented in:
+The governing decisions are documented in:
 
 - [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md)
 - [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md)

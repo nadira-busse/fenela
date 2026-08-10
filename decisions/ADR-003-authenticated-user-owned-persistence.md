@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for MVP2. Not implemented in the current release.
+Accepted.
 
 ## Context
 
@@ -117,7 +117,7 @@ The implementation should therefore keep Fenéla's domain and application logic 
 
 ## Impact
 
-The current release remains local and device-based until MVP2 implementation is complete.
+The MVP2 repository now implements authenticated, user-owned persistence for the core persisted domain state. Some browser-local compatibility state remains intentionally during the transition, and production deployment is handled separately from this ADR.
 
 MVP2 implementation must:
 

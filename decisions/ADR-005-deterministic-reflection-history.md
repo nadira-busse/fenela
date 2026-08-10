@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for MVP2. Not implemented in the current release.
+Accepted.
 
 ## Context
 
@@ -18,7 +18,7 @@ For example, the current coaching flow asks:
 
 > What is making this step hard right now?
 
-The textarea is displayed, but its value is not currently read or persisted.
+The pause-reason textarea is now persisted as a factual FrictionEvent when the user deliberately submits non-empty text.
 
 If Fenéla asks a question like this, the answer should have a clear purpose.
 
@@ -130,8 +130,8 @@ Only fields with an explicit product purpose should be stored, and retention mus
 
 MVP2 implementation must:
 
-capture the current pause-reason textarea value before it can become a FrictionEvent;
-persist relevant action history;
+use persisted FrictionEvent data as factual reflection input;
+use persisted ActionEvent history as factual reflection input;
 make duplicate event writes safe where retries are possible;
 derive weekly and monthly facts deterministically;
 define user-timezone behavior before calendar-based aggregation is finalized;

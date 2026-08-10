@@ -127,9 +127,9 @@ After `npm run build`, the output should include the root page and the productio
 
 No development-only, test or obsolete API routes should appear.
 
-## 7. Supabase persistence foundation (MVP2, schema only)
+## 7. Supabase persistence and authentication (MVP2)
 
-MVP2 introduces authenticated, user-owned persistence on Supabase (Auth + PostgreSQL). The current repository state adds the schema/RLS foundation described in [ADR-003](../../decisions/ADR-003-authenticated-user-owned-persistence.md), [ADR-004](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md) and [ADR-005](../../decisions/ADR-005-deterministic-reflection-history.md), plus (as of Phase 3C-2) an authentication foundation that establishes a verified Supabase Auth session. No application code reads or writes the MVP2 domain tables (`goals`, `anchors`, `action_events`, etc.) yet — only session/identity handling is wired in.
+MVP2 uses Supabase Auth + PostgreSQL for authenticated, user-owned persistence. The current repository includes schema/RLS, authenticated server identity, canonical persistence for user/reminder preferences and Goal/Anchor state, immutable ActionEvent/FrictionEvent history, and authenticated Device/PushSubscription ownership. Reflection persistence is developed separately under ADR-005.
 
 ### Prerequisites
 
@@ -153,9 +153,10 @@ Add these values to `.env.local` once a Supabase project (local or hosted) exist
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 ```
 
-Both are browser-safe values. No server-side service-role key is required yet — this phase does not add any server code that calls Supabase. A service-role key must never be exposed through a `NEXT_PUBLIC_` variable.
+The two `NEXT_PUBLIC_` values are browser-safe. `SUPABASE_SECRET_KEY` is server-only and is used only by narrow privileged server-side operations that cannot run through an authenticated user session. It must never be exposed through a `NEXT_PUBLIC_` variable or imported into client code.
 
 ### Start the local stack and apply migrations
 
@@ -172,7 +173,7 @@ npx supabase db reset
 npm run db:types
 ```
 
-This runs `npx supabase gen types typescript --local` and writes `src/types/database.types.ts`. Regenerate after every schema migration. These are infrastructure types; application components are not expected to depend on them until a later MVP2 phase adds an actual data-access layer.
+This runs `npx supabase gen types typescript --local` and writes `src/types/database.types.ts`. Regenerate after every schema migration. These generated types describe the database contract used by the server-side data-access code. Regenerate them whenever a schema change alters tables, columns, functions or other generated database types.
 
 ### Validate schema and Row Level Security manually
 
@@ -205,7 +206,7 @@ With `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` set i
 - `/auth/signout` — clears the session;
 - `src/server/auth/requireUser.ts` — the one place server code should ask "who is the current user?".
 
-This route is a technical validation surface, not a redesigned first-run flow — Fenéla's core product loop does not require an account yet.
+The `/auth` route provides the Supabase authentication entry point used by the MVP2 authenticated flow.
 
 **Magic Link**: the local stack's Mailpit inbox (`http://127.0.0.1:54324`) receives the sign-in email. Request a link from `/auth`, open it in Mailpit, and follow it to complete the flow.
 

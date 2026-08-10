@@ -59,11 +59,9 @@ A short demo video is available here:
 
 Fenéla is a working application that I use myself.
 
-MVP1 established the core product loop and remains the current public implementation.
+MVP1 established the core product loop. MVP2 is now actively implemented in the repository and adds authenticated, user-owned persistence, canonical reminder/device ownership and factual event history. Deterministic reflection persistence is being added in the current development phase.
 
-I am now using the project to deepen my software engineering and systems architecture skills. The next version has accepted architecture decisions around authenticated user-owned persistence, clearer reminder ownership and limited weekly/monthly continuity.
-
-Those MVP2 decisions are documented before implementation starts. They are not current product functionality.
+The public production deployment has not yet been updated to this MVP2 repository state. Repository documentation therefore distinguishes between implemented and validated development work and functionality that is already available in the deployed application.
 
 I continue to improve Fenéla when there is a clear product, engineering or maintenance reason to do so, rather than adding features simply to make the project larger.
 

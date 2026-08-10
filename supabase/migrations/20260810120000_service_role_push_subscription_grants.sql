@@ -12,10 +12,10 @@
 -- service_role had only TRUNCATE/REFERENCES/TRIGGER, not SELECT/DELETE).
 --
 -- This is a proven defect, not a hypothetical one: the privileged admin
--- client this phase introduces (src/lib/supabase/adminClient.ts,
--- SUPABASE_SECRET_KEY) exists for exactly one job — deleting a
--- terminal-invalid PushSubscription during cron cleanup
--- (src/server/devices/deletePushSubscriptionByDeviceId.ts) — and running
+-- cleanup path this phase introduces uses the privileged server-only client
+-- (src/lib/supabase/adminClient.ts, SUPABASE_SECRET_KEY) for one narrow job:
+-- deleting a terminal-invalid PushSubscription during cron cleanup
+-- (src/server/devices/deletePushSubscriptionByDeviceId.ts). Running
 -- that exact operation against the real local database failed with
 -- "permission denied for table push_subscriptions" until this grant was
 -- added.

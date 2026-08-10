@@ -1,22 +1,18 @@
-// Privileged, server-only Supabase client (Phase 4D hardening §6/§7).
+// Privileged, server-only Supabase client.
 //
-// Uses SUPABASE_SECRET_KEY, which bypasses Row Level Security entirely —
-// this must NEVER be imported from client/browser code or a "use client"
-// component. It carries no `NEXT_PUBLIC_` prefix, so even in the worst
-// case of an accidental client-side import, Next.js does not inline its
-// value into the browser bundle (only NEXT_PUBLIC_* vars are); the import
-// would simply fail at runtime with "Missing required environment
-// variable" rather than leak the secret. Reserve actual use for the one
-// narrow, trusted cleanup responsibility that needs it
-// (src/server/devices/deletePushSubscriptionByDeviceId.ts), not as a
-// general-purpose privileged client.
+// Uses SUPABASE_SECRET_KEY. The service-role credential can bypass Row Level
+// Security, so this client must NEVER be imported from client/browser code or
+// a "use client" component. It carries no `NEXT_PUBLIC_` prefix and must remain
+// server-only.
+//
+// This is not a general-purpose data-access client. Use it only inside narrow,
+// trusted server-side operations that explicitly require privileged access;
+// normal user-owned reads/writes should use the authenticated SSR client and
+// RLS-scoped ownership instead.
 //
 // Deliberately not the cookie-aware SSR client in src/lib/supabase/server.ts:
-// this has no request/session context at all (its only caller today is the
-// cron route, which has no authenticated user), so session
-// persistence/refresh is disabled rather than left to depend on cookies
-// that don't exist here.
-
+// privileged operations do not derive authorization from a browser session, so
+// session persistence/refresh is disabled.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { requireEnv } from "@/lib/env";

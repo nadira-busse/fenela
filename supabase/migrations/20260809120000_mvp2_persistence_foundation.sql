@@ -259,9 +259,9 @@ create trigger push_subscriptions_set_updated_at
 -- =============================================================================
 --
 -- All tables below are user-owned, directly or indirectly, and are only ever
--- accessed by an authenticated Fenéla user or trusted server-side code
--- (service_role, which bypasses RLS and table grants entirely and therefore
--- needs no explicit grants here).
+-- accessed by an authenticated Fenéla user or trusted server-side code.
+-- A service-role key can bypass RLS, but it still needs the relevant table
+-- privileges; narrow service-role grants are added explicitly where required.
 --
 -- No table in this migration grants anything to `anon` — MVP2 has no
 -- anonymous-authentication stage (ADR-003) — so every policy below is scoped
@@ -493,10 +493,12 @@ grant select, insert on public.friction_events to authenticated;
 -- deterministic aggregation -> optional AI wording -> validation -> fallback,
 -- an orchestrated server-side process analogous to the existing
 -- /api/ai/anchors route, not a value the client assembles and writes
--- directly. Writes are therefore expected to happen through trusted
--- server-side application code using the service_role key (which bypasses
--- RLS and table grants), once that server route is implemented in a later
--- phase. No INSERT/UPDATE policy or grant is created here for `authenticated`.
+-- directly. Writes are therefore expected to happen through narrow, trusted
+-- server-side application code using the service_role key. The service_role
+-- bypasses RLS policy evaluation but still requires explicit PostgreSQL table
+-- privileges. The reflection write boundary is implemented separately with
+-- the minimum SELECT/INSERT grants required for that operation. No INSERT/UPDATE
+-- policy or grant is created here for `authenticated`.
 -- If a future phase decides the client should write reflections directly,
 -- that is a product/architecture decision to make explicitly then, not a
 -- default this migration should assume.

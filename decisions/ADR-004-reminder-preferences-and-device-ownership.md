@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for MVP2. Not implemented in the current release.
+Accepted.
 
 ## Context
 

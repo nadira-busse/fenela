@@ -2,9 +2,9 @@
 // (Phase 4D hardening §6). Called only from src/app/api/cron/push/route.ts,
 // which has no authenticated user session and therefore no RLS-scoped
 // client that could perform this delete on the user's behalf. Uses the
-// admin client (SUPABASE_SECRET_KEY, bypasses RLS) instead, scoped to
-// exactly this one responsibility — it must never grow into a general
-// admin/repository API.
+// admin client (SUPABASE_SECRET_KEY, bypasses RLS) instead. This helper is
+// scoped to exactly this cleanup responsibility and must not grow into a
+// general privileged repository API.
 //
 // Not a Server Action and never exposed through any route response —
 // reachable only from trusted server code.

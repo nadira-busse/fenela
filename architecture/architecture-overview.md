@@ -285,42 +285,35 @@ Reminder setup does not block onboarding or the accountability flow.
 
 See [ADR-002: Optional Reminders](../decisions/ADR-002-optional-reminders.md).
 
-### No user accounts in the core product loop
+### Authenticated identity in the MVP2 core flow
 
-The core product loop uses local and device-based state and does not require a user account.
+MVP1 used local and device-based state without requiring an account. MVP2 changes that boundary: the current repository uses Supabase Auth as the identity root for persisted user-owned data.
 
-This keeps the current product implementation focused by avoiding, in the routes that make up that loop:
+Authenticated product flows now derive identity server-side through `requireUser()` and persist user-owned preferences, reminder settings, Goals, Anchors, ActionEvents and FrictionEvents in PostgreSQL with RLS-backed ownership boundaries. Browser-local state remains only where it still serves compatibility or device-specific UI behavior.
 
-- profile and account management;
-- cross-device synchronization;
-- additional persistent personal data;
-- account recovery and deletion flows.
+Account deletion, retention policy and the final production privacy lifecycle remain separate later work.
 
-Accounts are not required for the current core loop. A technical authentication foundation now exists as MVP2 infrastructure (see below), but it is not yet wired into onboarding, and no domain data (goals, anchors, reminders, reflections) is scoped to an authenticated user yet.
+### Implemented MVP2 identity and persistence direction
 
-Introducing accounts into the core product loop would require a separate product decision because it changes the data, privacy and security model of that loop.
+The accepted MVP2 baseline uses Supabase Auth with PostgreSQL for canonical user-owned persistence. The current repository includes:
 
-### Accepted MVP2 identity and persistence direction
+- version-controlled schema, constraints and RLS under `supabase/migrations/`;
+- browser/server Supabase client boundaries and authenticated session handling;
+- server-derived identity through `requireUser()`;
+- canonical persistence for user preferences and reminder preferences;
+- atomic Goal + Anchor persistence;
+- immutable ActionEvent and FrictionEvent history;
+- authenticated Device and PushSubscription ownership;
+- operational KV state separated from canonical PostgreSQL ownership/configuration.
 
-The core product loop still has no user accounts and remains browser- and device-based.
-
-For MVP2, a separate architecture decision has been accepted: persistent personal history will belong to an authenticated user rather than to a browser-generated device identity.
-
-The accepted MVP2 baseline uses Supabase Auth with PostgreSQL for user-owned persistence.
-
-This is being implemented in phases. The current release includes:
-
-- a version-controlled schema/RLS foundation under `supabase/migrations/` (Phase 3C-1);
-- a technical authentication foundation (Phase 3C-2): separate browser (`src/lib/supabase/client.ts`) and server (`src/lib/supabase/server.ts`) Supabase clients, a session-refresh boundary (`src/proxy.ts`), an `/auth/callback` route, a central `requireUser()` server helper, Google OAuth and Magic Link technical sign-in, and sign-out.
-
-Neither phase is wired into onboarding or the core product loop yet: no application code reads or writes the MVP2 domain tables (`goals`, `anchors`, `action_events`, etc.), and `requireUser()` is not called from any product route. That integration is separate, later work.
+The production Vercel deployment has not yet been updated to the completed MVP2 development state.
 
 See:
 
 - [ADR-003: Authenticated User-Owned Persistence](../decisions/ADR-003-authenticated-user-owned-persistence.md)
 - [ADR-004: Reminder Preferences and Device Ownership](../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
 - [ADR-005: Deterministic Reflection History](../decisions/ADR-005-deterministic-reflection-history.md)
-- [Local setup](../docs/technical/local-setup.md) for how to run the local Supabase stack and manually validate both the schema/RLS foundation and the authentication foundation.
+- [Local setup](../docs/technical/local-setup.md) for the local Supabase stack and validation workflow.
 
 ### Safety and validation
 
@@ -337,36 +330,23 @@ These controls reduce risk. They do not create complete content moderation, iden
 
 The AI-specific limits are documented in [AI and ethical-use guardrails](../docs/product/ai-guardrails.md). Operational cleanup and dependency details are documented in [Maintenance notes](../docs/technical/maintenance-notes.md).
 
-## Future architecture decisions
+## Remaining MVP2 architecture work
 
-MVP2 now has accepted architecture decisions for:
+ADR-003 through ADR-005 define the accepted direction for authenticated persistence, reminder/device ownership and deterministic reflection history. The repository already implements the identity, persistence, reminder/device ownership and factual-history foundations; reflection persistence is completed and reviewed as a separate phase before product presentation is added.
 
-- authenticated user-owned persistence;
-- reminder preferences separated from device and push delivery;
-- persistent action and friction history;
-- deterministic weekly and monthly reflection facts;
-- optional bounded AI wording on top of those facts.
+Remaining work is intentionally narrower and includes:
 
-These decisions are documented in ADR-003 through ADR-005.
-
-They are **not implemented in the current release**.
-
-Several implementation details still need to be resolved before MVP2 is complete, including:
-
-- the final relational schema;
-- retention periods;
-- account deletion behavior;
-- exact timezone and calendar-boundary behavior;
-- multi-device reminder behavior;
-- data-access boundaries in the application code.
-
-These details should be decided when the implementation reaches the relevant responsibility rather than being abstracted in advance.
+- account deletion and retention behavior;
+- final privacy/data-purpose documentation;
+- production configuration and deployment acceptance;
+- multi-device reminder behavior only if a real product need justifies it;
+- optional AI wording only downstream of deterministic ReflectionFacts.
 
 The product boundary remains unchanged: Fenéla should stay calm, small and focused even as persistence and ownership become more explicit.
 
 ## Scope boundary
 
-Product exclusions such as accounts, dashboards, streaks, journaling and advanced AI planning are documented in [MVP scope](../docs/product/mvp-scope.md).
+Product exclusions such as dashboards, streaks, journaling and advanced AI planning are documented in [MVP scope](../docs/product/mvp-scope.md).
 
 The architecture does not prepare for those features in advance. New abstractions should only be added when they solve an actual product or maintenance problem.
 

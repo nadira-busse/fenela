@@ -1,0 +1,27 @@
+-- Fenéla MVP2 — Phase 4E: service_role grants for the privileged
+-- reflections write path.
+--
+-- Same root cause already fixed once for push_subscriptions
+-- (supabase/migrations/20260810120000_service_role_push_subscription_grants.sql):
+-- supabase/migrations/20260809120000_mvp2_persistence_foundation.sql's own
+-- comment on `reflections` RLS explicitly anticipates that "Writes are
+-- therefore expected to happen through trusted server-side application
+-- code using the service_role key" — but never actually granted
+-- service_role anything on this table. BYPASSRLS lets service_role skip
+-- Row Level Security policy evaluation; it does not grant standard SQL
+-- table privileges, which Postgres still enforces for every role.
+--
+-- Proven against the real local database: src/server/reflections/
+-- createReflectionForPeriod.ts's INSERT (with .select().single() to
+-- return the created row, exactly as its own code does) failed with
+-- "permission denied for table reflections" until this grant was added —
+-- Postgres's own error hint named the exact fix applied here.
+--
+-- Scoped to exactly what that one write boundary needs: INSERT (to create
+-- a Reflection) and SELECT (PostgREST requires it to return the inserted
+-- row's representation). No UPDATE/DELETE — reflections are immutable
+-- historical artifacts (ADR-005); the existing `authenticated` grant
+-- already covers all read access reflections needs elsewhere. Not
+-- extended to any other table.
+
+grant select, insert on public.reflections to service_role;

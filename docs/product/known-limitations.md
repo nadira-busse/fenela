@@ -1,22 +1,16 @@
 # Known Limitations
 
-This document describes the current boundaries of Fenéla MVP 1.
+This document describes the current boundaries of the Fenéla MVP2 repository state.
 
-Some are deliberate product choices. Others follow from the current browser-, device- and infrastructure-based implementation.
+Some are deliberate product choices. Others follow from browser, device, deployment and infrastructure constraints. The production deployment has not yet been updated to the final MVP2 repository state.
 
-## Device-based state
+## Account and device state
 
-Fenéla has no login or account synchronization.
+MVP2 uses Supabase Auth and authenticated, user-owned PostgreSQL persistence for canonical preferences, Goals, Anchors, reminder preferences and factual event history.
 
-Screening answers, saved anchors, day state and reminder settings belong to the current browser or installed PWA.
+Some compatibility/day-state UI data remains browser-local. Push subscriptions remain device-specific and belong to an authenticated Device row; a device identifier is not an authorization credential.
 
-Using Fenéla on another device, in another browser or in another browser profile may require setup again.
-
-Push subscriptions also remain device-specific.
-
-MVP2 now has an accepted architecture decision for authenticated, user-owned persistence.
-
-That work is not implemented in the current release, so the limitations above still apply to the application today.
+Full multi-device fanout is not implemented.
 
 See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md).
 
@@ -40,9 +34,9 @@ On iPhone and iPad, Web Push should be tested through a Home Screen installation
 
 ## Reminder settings
 
-Reminder settings apply to the current browser or installed PWA.
+For authenticated users, reminder `enabled` state and daily `start_time` are canonical account-owned `ReminderPreference` data in PostgreSQL. Push delivery remains device-specific.
 
-Changing or disabling reminders on one device does not update another device.
+The current MVP2 scope does not add sophisticated multi-device reminder fanout.
 
 ## Private browsing
 
@@ -65,21 +59,15 @@ Browsers normally update the application automatically, but development testing 
 
 ## Timezone
 
-Daily reminders and day-state keys use `Europe/Amsterdam`.
+Authenticated reminder scheduling and factual event dates use the canonical IANA timezone stored in `user_preferences.time_zone`.
 
-Users in other timezones may therefore see reminder timing or day boundaries that do not match their local time.
+Some legacy/local compatibility behavior may still use browser-local state, but authenticated scheduling no longer assumes `Europe/Amsterdam`.
 
-## Public-route protection
+## Authentication and route protection
 
-Fenéla's public product routes have no user authentication.
+MVP2 uses Supabase Auth for user-owned persistence and derives authenticated identity server-side. RLS and ownership checks protect account-owned data; device identifiers are not treated as authorization credentials.
 
-Public AI and reminder routes use validation and rate limiting to reduce repeated use, cost exposure and storage growth.
-
-These controls are not identity verification and do not fully prevent deliberate abuse.
-
-MVP2 will introduce authenticated ownership for persistent user and reminder data. A technical authentication foundation (Supabase Auth sign-in/sign-out) now exists at `/auth`, but it is not yet connected to any product route above, and no user or reminder data is scoped to an authenticated user in the current release.
-
-Rate limiting and other abuse controls will remain separate from authentication where they still serve a different purpose.
+Validation, rate limiting and other abuse controls remain separate from authentication where they serve a different purpose. They reduce repeated use, cost exposure or storage growth but are not substitutes for identity and authorization.
 
 See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md) and [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md).
 

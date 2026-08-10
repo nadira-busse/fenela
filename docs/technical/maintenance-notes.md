@@ -6,26 +6,18 @@ It focuses on device cleanup, cross-platform dependency checks and known upstrea
 
 ## Device records and cleanup
 
-Fenéla uses a device-based reminder model.
+MVP2 separates canonical account ownership in PostgreSQL from operational push-delivery state in KV. An authenticated browser/device has an owned `devices` row in PostgreSQL; KV stores delivery-oriented subscription/job pointers keyed by that device ID.
 
-A browser, browser profile or installed PWA receives its own local device ID. During development, clearing browser data, reinstalling the PWA or repeatedly resetting the application can create multiple device records in KV storage.
+When a push subscription is confirmed terminally invalid (404/410), cleanup removes the PushSubscription and associated operational KV delivery state. The canonical PostgreSQL Device row is preserved; it is not reassigned or deleted as part of terminal-subscription cleanup.
 
-Older records may remain after the browser has lost its local state or push subscription.
+The cron worker therefore:
 
-The cron worker reduces stale state by:
+- skips devices without usable operational subscription state;
+- removes terminally invalid push-subscription state;
+- removes associated KV jobs/pointers;
+- avoids rescheduling delivery to a subscription that can no longer receive notifications.
 
-- skipping devices without a valid subscription;
-- removing device data after a push subscription is confirmed invalid;
-- avoiding rescheduling for devices that can no longer receive notifications.
-
-When a push subscription is no longer valid, the cleanup flow can remove:
-
-- the stored subscription;
-- the device record;
-- the daily reminder pointer;
-- pending reminder jobs associated with that device.
-
-A failed daily reminder is not rescheduled when the device can no longer receive push notifications.
+Transient delivery failures such as network errors, 429 responses or 5xx responses do not delete the subscription or Device row.
 
 ## Maintenance scripts
 
@@ -38,19 +30,21 @@ scripts/cleanup-all-devices.mjs
 
 ### `cleanup-devices.mjs`
 
-This script audits registered devices and removes records that no longer have an active push subscription.
+This legacy maintenance script audits KV-registered device IDs and removes operational KV records that no longer have an active push subscription.
 
-Use it when development or repeated browser resets have left stale device records in KV storage.
+It does not delete canonical PostgreSQL `devices` rows. Use it only when development or repeated browser resets have left stale KV delivery records.
 
 ### `cleanup-all-devices.mjs`
 
-This script removes all registered device data handled by the reminder system, including:
+This destructive maintenance script clears the reminder system's KV-managed operational state, including:
 
-- device records;
-- push subscriptions;
+- KV device-set entries;
+- KV push-subscription payloads;
 - scheduled reminder jobs;
 - daily reminder pointers;
 - legacy reminder keys covered by the script.
+
+It does not remove canonical PostgreSQL account-owned Device rows or ReminderPreference rows.
 
 This is a destructive reset. The script requires explicit confirmation before deleting data.
 
