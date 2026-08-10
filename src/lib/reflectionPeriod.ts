@@ -52,6 +52,42 @@ function startOfWeek(anchor: Date): Date {
   return start;
 }
 
+export type GetPreviousCompletedWeeklyPeriodInput = {
+  referenceInstant: Date;
+  timeZone: string;
+};
+
+// Phase 4F §"Completed-week semantics": the most recently fully completed
+// Monday..Sunday week as of `referenceInstant`'s local calendar date — never
+// the week `referenceInstant` itself falls in, since that week may still be
+// in progress and Reflection rows are immutable (persisting one for an
+// incomplete week would permanently lock in a stale/partial row for the
+// rest of that week). Reuses the exact same local-date derivation and
+// Monday-anchoring as getReflectionPeriod("WEEKLY", ...) above, then steps
+// back exactly one calendar week — so it inherits the same DST-safety
+// property (pure calendar-day arithmetic on a UTC-anchored scratchpad Date,
+// never re-interpreted through a timezone again).
+export function getPreviousCompletedWeeklyPeriod(
+  input: GetPreviousCompletedWeeklyPeriodInput
+): ReflectionPeriod {
+  const { year, month, day } = getZonedParts(input.referenceInstant.getTime(), input.timeZone);
+  const localAnchor = toCalendarAnchor(year, month, day);
+  const currentWeekStart = startOfWeek(localAnchor);
+
+  const start = new Date(currentWeekStart);
+  start.setUTCDate(start.getUTCDate() - 7);
+
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+
+  return {
+    type: "WEEKLY",
+    start: formatCalendarDate(start),
+    end: formatCalendarDate(end),
+    timeZone: input.timeZone,
+  };
+}
+
 export function getReflectionPeriod(input: GetReflectionPeriodInput): ReflectionPeriod {
   const { year, month, day } = getZonedParts(input.referenceInstant.getTime(), input.timeZone);
   const localAnchor = toCalendarAnchor(year, month, day);

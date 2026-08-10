@@ -36,6 +36,9 @@ export const OWNED_STORAGE_KEYS = [
   "careAnchors",
   "fenela:dayLogs",
   "anchor:dayState",
+  // Phase 4F: which weekly Reflection this device has already shown — see
+  // src/app/reflections/weeklyReflectionLocalState.ts.
+  "fenela:reflection:weekly:lastSeenId",
 ] as const;
 
 // Device/reminder-local cache removed on explicit sign-out only, never by

@@ -8,6 +8,7 @@ import IntakeScreen, {
 } from "./components/IntakeScreen";
 import CoachingScreen from "./components/CoachingScreen";
 import AuthGateScreen from "./components/AuthGateScreen";
+import WeeklyReflectionGate from "./components/WeeklyReflectionGate";
 import {
   loadFromStorage,
   saveToStorage,
@@ -272,16 +273,18 @@ export default function HomeClient({
           skipNameStep={Boolean(identityName)}
         />
       ) : (
-        <CoachingScreen
-          key={coachMountKey}
-          intake={intake}
-          goalId={goalId}
-          reminderPreference={goalId ? reminderPreference : null}
-          onResetEverything={resetEverything}
-          onRestartDay={restartDay}
-          newGoalPending={archivingNewGoal}
-          newGoalError={newGoalError}
-        />
+        <WeeklyReflectionGate enabled={isAuthenticated && Boolean(goalId)}>
+          <CoachingScreen
+            key={coachMountKey}
+            intake={intake}
+            goalId={goalId}
+            reminderPreference={goalId ? reminderPreference : null}
+            onResetEverything={resetEverything}
+            onRestartDay={restartDay}
+            newGoalPending={archivingNewGoal}
+            newGoalError={newGoalError}
+          />
+        </WeeklyReflectionGate>
       )}
     </>
   );

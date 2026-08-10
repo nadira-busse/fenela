@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getReflectionPeriod } from "./reflectionPeriod";
+import { getReflectionPeriod, getPreviousCompletedWeeklyPeriod } from "./reflectionPeriod";
 
 const AMSTERDAM = "Europe/Amsterdam";
 
@@ -202,5 +202,166 @@ describe("getReflectionPeriod — MONTHLY", () => {
       end: "2026-02-28",
       timeZone: "America/Los_Angeles",
     });
+  });
+});
+
+describe("getPreviousCompletedWeeklyPeriod", () => {
+  it("a Monday reference resolves to the immediately preceding Monday..Sunday week", () => {
+    // 2026-08-24 is a Monday.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-08-24T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-08-17",
+      end: "2026-08-23",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("a Wednesday reference resolves to the same preceding week as the Monday in that week", () => {
+    // 2026-08-26 is a Wednesday, inside the week starting 2026-08-24.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-08-26T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-08-17",
+      end: "2026-08-23",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("a Sunday reference resolves to the same preceding week as the rest of its own current week", () => {
+    // 2026-08-30 is a Sunday, the last day of the week starting 2026-08-24.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-08-30T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-08-17",
+      end: "2026-08-23",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("the following Monday advances the eligible period by exactly one week", () => {
+    // 2026-08-31 is a Monday, the week after the previous three cases.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-08-31T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-08-24",
+      end: "2026-08-30",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("never resolves to the reference instant's own current week, even at the end of that week", () => {
+    // 2026-08-30 (Sunday) — the current week is 2026-08-24..2026-08-30. The
+    // eligible period must be the one immediately before it, never that
+    // still-in-progress-until-midnight current week.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-08-30T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result.start).not.toBe("2026-08-24");
+    expect(result.end).not.toBe("2026-08-30");
+  });
+
+  it("a preceding week crossing a month boundary spans both months correctly", () => {
+    // Current week starting 2026-04-06 (Monday); the preceding week is
+    // 2026-03-30..2026-04-05, crossing the March/April boundary.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-04-08T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-03-30",
+      end: "2026-04-05",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("a preceding week crossing a year boundary spans both years correctly", () => {
+    // 2026-01-05 is a Monday; the preceding week is 2025-12-29..2026-01-04.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-01-05T10:00:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2025-12-29",
+      end: "2026-01-04",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("resolves the correct preceding local week across the Europe/Amsterdam DST transition", () => {
+    // Same instant as the getReflectionPeriod DST test: 23:30 UTC on
+    // 2026-03-29 is already 01:30 CEST on 2026-03-30 locally, so the
+    // current week is 2026-03-30..2026-04-05 and the preceding, eligible
+    // week is 2026-03-23..2026-03-29 — the week DST spring-forward fell
+    // inside.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-03-29T23:30:00.000Z"),
+      timeZone: AMSTERDAM,
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-03-23",
+      end: "2026-03-29",
+      timeZone: AMSTERDAM,
+    });
+  });
+
+  it("resolves correctly in a non-Amsterdam IANA zone (America/Los_Angeles)", () => {
+    // 2026-03-16T05:00:00Z is still 2026-03-15 21:00 in Los Angeles (a
+    // Sunday), so the current week there is 2026-03-09..2026-03-15 and the
+    // preceding, eligible week is 2026-03-02..2026-03-08.
+    const result = getPreviousCompletedWeeklyPeriod({
+      referenceInstant: new Date("2026-03-16T05:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(result).toEqual({
+      type: "WEEKLY",
+      start: "2026-03-02",
+      end: "2026-03-08",
+      timeZone: "America/Los_Angeles",
+    });
+  });
+
+  it("always resolves to a Monday start and Sunday end", () => {
+    for (const iso of [
+      "2026-01-01T12:00:00.000Z",
+      "2026-06-15T12:00:00.000Z",
+      "2026-12-31T12:00:00.000Z",
+    ]) {
+      const result = getPreviousCompletedWeeklyPeriod({
+        referenceInstant: new Date(iso),
+        timeZone: AMSTERDAM,
+      });
+
+      const startWeekday = new Date(`${result.start}T00:00:00.000Z`).getUTCDay();
+      const endWeekday = new Date(`${result.end}T00:00:00.000Z`).getUTCDay();
+
+      expect(startWeekday).toBe(1); // Monday
+      expect(endWeekday).toBe(0); // Sunday
+    }
   });
 });
