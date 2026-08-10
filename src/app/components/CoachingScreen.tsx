@@ -15,6 +15,10 @@ import {
 } from "@/lib/storage";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { enablePushForCurrentDevice, getNotificationPermission } from "@/lib/pushClient";
+import { createActionEventAction } from "@/server/events/createActionEventAction";
+import { createFrictionEventAction } from "@/server/events/createFrictionEventAction";
+import type { ActionEventType } from "@/lib/eventMapping";
+import { createPendingEventIdSlot } from "@/lib/pendingEventId";
 
 type EnhancedCoachState =
   | CoachState
@@ -114,6 +118,32 @@ function saveDailyReminderSettings(input: { enabled: boolean; startTime: string 
 
   window.localStorage.setItem(DAILY_REMINDERS_ENABLED_KEY, String(input.enabled));
   window.localStorage.setItem(DAILY_REMINDER_TIME_KEY, input.startTime);
+}
+
+// Shared retry/error plumbing for the two ActionEvent/FrictionEvent writes
+// that gate a local UI transition (COMPLETED, PARKED_TODAY, and a friction
+// submission — Phase 4C §10). Not a generic persistence abstraction: it
+// only standardizes "attempt, and tell the caller whether local state may
+// now advance," while each call site still owns its own pending/error
+// state and stable client_event_id.
+async function attemptEventWrite(
+  write: () => Promise<{ ok: true } | { ok: false; message: string }>,
+  onError: (message: string) => void
+): Promise<boolean> {
+  try {
+    const result = await write();
+
+    if (!result.ok) {
+      onError(result.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("Event write failed.", error);
+    onError("Could not save this right now. Please try again.");
+    return false;
+  }
 }
 
 function stateNeedsActiveTask(state: EnhancedCoachState) {
@@ -366,6 +396,29 @@ export default function CoachingScreen({
   const [reminderActionStatus, setReminderActionStatus] = useState<ReminderActionStatus>("idle");
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [showReminderSettingsPage, setShowReminderSettingsPage] = useState(false);
+
+  // ActionEvent/FrictionEvent write state (Phase 4C §10) — only meaningful
+  // for authenticated Coaching (goalId set); the unauthenticated/local-only
+  // MVP1 path never sets these.
+  const [completePending, setCompletePending] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [parkPending, setParkPending] = useState(false);
+  const [parkError, setParkError] = useState<string | null>(null);
+  const [frictionPending, setFrictionPending] = useState(false);
+  const [frictionError, setFrictionError] = useState<string | null>(null);
+  const [postponePending, setPostponePending] = useState(false);
+  const [postponeError, setPostponeError] = useState<string | null>(null);
+
+  // Stable client_event_id per pending logical interaction, so a retry
+  // after a failed write reuses the same id (Phase 4C §5) instead of
+  // generating a new one. Cleared back to null once that write succeeds,
+  // so the next distinct interaction gets a fresh id. One ref per slot
+  // instance keeps it stable across this component's re-renders, exactly
+  // like the raw ref value it replaces (see src/lib/pendingEventId.ts).
+  const completeEventIdSlot = useRef(createPendingEventIdSlot()).current;
+  const parkEventIdSlot = useRef(createPendingEventIdSlot()).current;
+  const frictionEventIdSlot = useRef(createPendingEventIdSlot()).current;
+  const postponeEventIdSlot = useRef(createPendingEventIdSlot()).current;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -654,6 +707,66 @@ export default function CoachingScreen({
     await cancelNowReminder(jobId);
   };
 
+  // Fire-and-forget ActionEvent write for STARTED (Phase 4C §10): it does
+  // not correspond to a local taskHistory entry the End-of-day screen
+  // already shows the user, so a failure here cannot create a visible
+  // local/canonical contradiction — the local transition is not blocked on
+  // it, matching this file's existing best-effort reminder-scheduling
+  // pattern (see scheduleNowReminder/cancelNowReminder above). POSTPONED is
+  // NOT recorded through this helper (Phase 4C hardening, Defect B) — see
+  // savePauseReason(), the single point that writes it.
+  const recordActionEvent = (anchorId: string, eventType: ActionEventType) => {
+    if (!goalId) return;
+
+    createActionEventAction({
+      anchorId,
+      eventType,
+      clientEventId: crypto.randomUUID(),
+    })
+      .then((result) => {
+        if (!result.ok) {
+          console.warn(`Could not record ${eventType} action event.`, result.message);
+        }
+      })
+      .catch((error) => {
+        console.warn(`Could not record ${eventType} action event.`, error);
+      });
+  };
+
+  // Reads the (uncontrolled) pause-reason textarea and, for authenticated
+  // Coaching with real friction text, blocks on persisting it before the
+  // caller may advance the screen (Phase 4C §8/§18) — unlike
+  // recordActionEvent, a FrictionEvent corresponds to user-authored text
+  // that must not silently disappear on failure. Returns true when it is
+  // safe to proceed (nothing to submit, or the submission succeeded).
+  const submitFrictionIfPresent = async (anchorId: string): Promise<boolean> => {
+    if (!goalId) return true;
+
+    const reason = textareaRef.current?.value.trim() ?? "";
+    if (!reason) return true;
+
+    setFrictionPending(true);
+    setFrictionError(null);
+
+    const ok = await attemptEventWrite(
+      () =>
+        createFrictionEventAction({
+          anchorId,
+          reason,
+          clientEventId: frictionEventIdSlot.get(),
+        }),
+      setFrictionError
+    );
+
+    setFrictionPending(false);
+
+    if (ok) {
+      frictionEventIdSlot.clear();
+    }
+
+    return ok;
+  };
+
   const handleStartDay = () => {
     setState(activeTasks.length > 0 ? "DO_ACTION" : "DONE");
   };
@@ -665,6 +778,17 @@ export default function CoachingScreen({
       return;
     }
 
+    // The pause-reason textarea only exists on PAUSE_QUESTION — reading it
+    // here as well as from savePauseReason() means the friction answer is
+    // captured regardless of which of that screen's two exits the user
+    // takes (Phase 4C §8/ADR-005).
+    if (state === "PAUSE_QUESTION") {
+      const submitted = await submitFrictionIfPresent(currentTask.id);
+      if (!submitted) return;
+    }
+
+    recordActionEvent(currentTask.id, "STARTED");
+
     setState("AWAITING_DONE");
     await scheduleNowReminder();
   };
@@ -674,6 +798,31 @@ export default function CoachingScreen({
       setNowReminderJobId(null);
       setState("DONE");
       return;
+    }
+
+    if (goalId) {
+      setCompletePending(true);
+      setCompleteError(null);
+
+      const ok = await attemptEventWrite(
+        () =>
+          createActionEventAction({
+            anchorId: currentTask.id,
+            eventType: "COMPLETED",
+            clientEventId: completeEventIdSlot.get(),
+          }),
+        setCompleteError
+      );
+
+      setCompletePending(false);
+
+      // Stay on AWAITING_DONE with the same currentTask so the user can
+      // retry with the same button (Phase 4C §10/§18) — the local
+      // taskHistory "done" entry below must not be written until this
+      // succeeds, since that entry is what the End-of-day screen shows.
+      if (!ok) return;
+
+      completeEventIdSlot.clear();
     }
 
     const jobId = nowReminderJobId;
@@ -704,6 +853,12 @@ export default function CoachingScreen({
       return;
     }
 
+    // No ActionEvent here (Phase 4C hardening, Defect B): "Later" begins
+    // the postponement/pause flow, not the factual decision itself — the
+    // decision is either "I'll do it now" (STARTED, no postponement after
+    // all) or the final "Try again later" (POSTPONED, in savePauseReason).
+    // Writing POSTPONED at every escalation step as well would double-count
+    // one hesitation sequence in weekly/monthly factual aggregation.
     await cancelIfExists();
 
     const nextPauseCount = currentTask.pauseCount + 1;
@@ -735,6 +890,35 @@ export default function CoachingScreen({
       return;
     }
 
+    const submitted = await submitFrictionIfPresent(currentTask.id);
+    if (!submitted) return;
+
+    // This is the final postponement decision (Phase 4C hardening,
+    // Defect B) — the one and only place POSTPONED is written, so it is
+    // blocking like COMPLETED/PARKED_TODAY: local state (the requeue back
+    // to DO_ACTION below) must not advance until the factual event is
+    // actually recorded, or a DB failure would produce false local success.
+    if (goalId) {
+      setPostponePending(true);
+      setPostponeError(null);
+
+      const ok = await attemptEventWrite(
+        () =>
+          createActionEventAction({
+            anchorId: currentTask.id,
+            eventType: "POSTPONED",
+            clientEventId: postponeEventIdSlot.get(),
+          }),
+        setPostponeError
+      );
+
+      setPostponePending(false);
+
+      if (!ok) return;
+
+      postponeEventIdSlot.clear();
+    }
+
     await cancelIfExists();
 
     const updatedTask = { ...currentTask, pauseCount: 2 };
@@ -747,6 +931,30 @@ export default function CoachingScreen({
       setNowReminderJobId(null);
       setState("DONE");
       return;
+    }
+
+    if (goalId) {
+      setParkPending(true);
+      setParkError(null);
+
+      const ok = await attemptEventWrite(
+        () =>
+          createActionEventAction({
+            anchorId: currentTask.id,
+            eventType: "PARKED_TODAY",
+            clientEventId: parkEventIdSlot.get(),
+          }),
+        setParkError
+      );
+
+      setParkPending(false);
+
+      // Stay on DIRECTIONAL_MOTIVATION with the same currentTask so the
+      // user can retry (Phase 4C §10/§18) — the local taskHistory "parked"
+      // entry below must not be written until this succeeds.
+      if (!ok) return;
+
+      parkEventIdSlot.clear();
     }
 
     await cancelIfExists();
@@ -867,7 +1075,15 @@ export default function CoachingScreen({
             {ai.waitingLine ?? currentTask?.text ?? "One small step"}
           </p>
 
-          <ActionBtn onClick={handleDone}>{ai.doneCta ?? "Done"}</ActionBtn>
+          <ActionBtn onClick={handleDone} disabled={completePending}>
+            {completePending ? "Saving…" : (ai.doneCta ?? "Done")}
+          </ActionBtn>
+
+          {completeError ? (
+            <p role="alert" className="text-xs leading-relaxed text-red-700 text-center mt-2">
+              {completeError}
+            </p>
+          ) : null}
         </Card>
       </Shell>
     );
@@ -896,10 +1112,28 @@ export default function CoachingScreen({
             rows={3}
           />
 
-          <ActionBtn onClick={handleNow}>{ai.pauseDoNowCta ?? "I'll do it now"}</ActionBtn>
-          <ActionBtn onClick={savePauseReason} variant="ghost">
-            {ai.pauseSaveCta ?? "Try again later"}
+          <ActionBtn onClick={handleNow} disabled={frictionPending || postponePending}>
+            {ai.pauseDoNowCta ?? "I'll do it now"}
           </ActionBtn>
+          <ActionBtn
+            onClick={savePauseReason}
+            variant="ghost"
+            disabled={frictionPending || postponePending}
+          >
+            {postponePending ? "Saving…" : (ai.pauseSaveCta ?? "Try again later")}
+          </ActionBtn>
+
+          {frictionError ? (
+            <p role="alert" className="text-xs leading-relaxed text-red-700 text-center mt-2">
+              {frictionError}
+            </p>
+          ) : null}
+
+          {postponeError ? (
+            <p role="alert" className="text-xs leading-relaxed text-red-700 text-center mt-2">
+              {postponeError}
+            </p>
+          ) : null}
         </Card>
       </Shell>
     );
@@ -922,7 +1156,15 @@ export default function CoachingScreen({
             </p>
           ) : null}
 
-          <ActionBtn onClick={parkTaskFinal}>{ai.directionalCta ?? "Okay"}</ActionBtn>
+          <ActionBtn onClick={parkTaskFinal} disabled={parkPending}>
+            {parkPending ? "Saving…" : (ai.directionalCta ?? "Okay")}
+          </ActionBtn>
+
+          {parkError ? (
+            <p role="alert" className="text-xs leading-relaxed text-red-700 text-center mt-2">
+              {parkError}
+            </p>
+          ) : null}
         </Card>
       </Shell>
     );
