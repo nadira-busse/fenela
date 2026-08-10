@@ -2,13 +2,17 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { saveCareAnchors } from "@/lib/storage";
-import { AnchorValidationError, validateSafeAnchorText, validateSafeUserText } from "@/lib/safety";
-import { CareAnchor } from "@/types/CareAnchor";
+import { validateSafeAnchorText, validateSafeUserText } from "@/lib/safety";
+import { CareAnchor, AnchorSource } from "@/types/CareAnchor";
 import { PersonalAnchorInterpretation } from "@/types/intake";
 import { makeId } from "@/lib/id";
 import { AnchorChoiceHelp, loadScreening, ScreeningV1 } from "@/lib/screeningStorage";
 import { getOrCreateDeviceId } from "@/lib/device";
+import {
+  mapApiSourceToAnchorSource,
+  mapApiSourceToInterpretationSource,
+  type InterpretationSource,
+} from "@/lib/goalMapping";
 
 /** CONFIG */
 const MIN_ANCHORS = 1;
@@ -79,9 +83,15 @@ const SecondaryBtn = ({
   </button>
 );
 
+type GeneratedAnchor = {
+  text: string;
+  source: AnchorSource;
+};
+
 type AnchorGenerationResult = {
-  anchors: string[];
+  anchors: GeneratedAnchor[];
   personalAnchorInterpretation: PersonalAnchorInterpretation;
+  interpretationSource: InterpretationSource;
 };
 
 type AnchorsApiResponse = {
@@ -89,6 +99,8 @@ type AnchorsApiResponse = {
   error?: string;
   anchors?: { text?: string }[];
   personalAnchorInterpretation?: PersonalAnchorInterpretation;
+  // "ai" | "fallback" | "deterministic" — see src/app/api/ai/anchors/route.ts.
+  source?: string;
 };
 
 function isPersonalAnchorInterpretation(value: unknown): value is PersonalAnchorInterpretation {
@@ -149,10 +161,16 @@ async function generateAnchorsClient(payload: {
     );
   }
 
-  const anchors = anchorsRaw
-    .map((item) => String(item?.text ?? ""))
-    .map((text) => text.trim())
-    .filter((text) => text.length > 0);
+  // Provenance traced from the API's own response-level `source`, not
+  // guessed from text (Phase 4B §6) — every anchor in one response shares
+  // it, since a single call is either a genuine AI generation or a
+  // deterministic/fallback one, never a mix.
+  const anchorSource = mapApiSourceToAnchorSource(data?.source ?? "fallback");
+
+  const anchors: GeneratedAnchor[] = anchorsRaw
+    .map((item) => String(item?.text ?? "").trim())
+    .filter((text) => text.length > 0)
+    .map((text) => ({ text, source: anchorSource }));
 
   const personalAnchorInterpretation = isPersonalAnchorInterpretation(
     data?.personalAnchorInterpretation
@@ -163,18 +181,25 @@ async function generateAnchorsClient(payload: {
   return {
     anchors,
     personalAnchorInterpretation,
+    interpretationSource: mapApiSourceToInterpretationSource(data?.source ?? "fallback"),
   };
 }
 
 // --- MAIN ---
+export type IntakeCompletionData = {
+  name: string;
+  goal: string;
+  struggle: string;
+  goalWhy: string;
+  personalAnchorInterpretation?: PersonalAnchorInterpretation;
+  interpretationSource: InterpretationSource;
+  anchors: CareAnchor[];
+};
+
+export type IntakeCompletionResult = { ok: true } | { ok: false; message: string };
+
 interface IntakeScreenProps {
-  onComplete: (data: {
-    name: string;
-    goal: string;
-    struggle: string;
-    goalWhy: string;
-    personalAnchorInterpretation?: PersonalAnchorInterpretation;
-  }) => void;
+  onComplete: (data: IntakeCompletionData) => Promise<IntakeCompletionResult>;
   initialName?: string;
   skipNameStep?: boolean;
 }
@@ -190,12 +215,19 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
   const [goalWhy, setGoalWhy] = useState("");
   const [personalAnchorInterpretation, setPersonalAnchorInterpretation] =
     useState<PersonalAnchorInterpretation | null>(null);
+  const [interpretationSource, setInterpretationSource] = useState<InterpretationSource | null>(
+    null
+  );
 
-  const [anchors, setAnchors] = useState<CareAnchor[]>([{ id: makeId("anchor"), text: "" }]);
+  const [anchors, setAnchors] = useState<CareAnchor[]>([
+    { id: makeId("anchor"), text: "", source: "USER" },
+  ]);
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [persistError, setPersistError] = useState<string | null>(null);
 
   const didGenerateRef = useRef(false);
 
@@ -305,7 +337,9 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
   const addAnchor = () => {
     setAnchors((prev) =>
-      prev.length >= MAX_ANCHORS ? prev : [...prev, { id: makeId("anchor"), text: "" }]
+      prev.length >= MAX_ANCHORS
+        ? prev
+        : [...prev, { id: makeId("anchor"), text: "", source: "USER" }]
     );
   };
 
@@ -336,8 +370,9 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
             goalWhy,
           })
         );
+        setInterpretationSource("FALLBACK");
 
-        setAnchors([{ id: makeId("anchor"), text: "" }]);
+        setAnchors([{ id: makeId("anchor"), text: "", source: "USER" }]);
 
         didGenerateRef.current = true;
         return;
@@ -360,13 +395,15 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
       const trimmed = generated.anchors.slice(0, desiredCount);
 
-      const nextAnchors: CareAnchor[] = trimmed.map((text) => ({
+      const nextAnchors: CareAnchor[] = trimmed.map((anchor) => ({
         id: makeId("anchor"),
-        text,
+        text: anchor.text,
+        source: anchor.source,
       }));
 
       setAnchors(nextAnchors);
       setPersonalAnchorInterpretation(generated.personalAnchorInterpretation);
+      setInterpretationSource(generated.interpretationSource);
       didGenerateRef.current = true;
     } catch (error: unknown) {
       const message =
@@ -382,6 +419,7 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
           goalWhy,
         })
       );
+      setInterpretationSource("FALLBACK");
       setAnchors([]);
       didGenerateRef.current = true;
     } finally {
@@ -407,40 +445,48 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAnchorsStep]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setFormError(null);
 
     if (!canContinue) return;
 
     if (step >= lastStep) {
       if (!anchorsValid) return;
+      if (submitting) return;
 
-      try {
-        saveCareAnchors(cleanedAnchors);
-      } catch (error: unknown) {
-        if (error instanceof AnchorValidationError) {
-          setFormError(error.message);
-          return;
-        }
-
-        throw error;
-      }
-
+      // Compatibility state (careAnchors/fenela:intake/dayState) is written
+      // by the caller only after onComplete's persistence result is known
+      // (Phase 4B hardening, Defect C) — not here, before that result exists.
       const trimmedGoalWhy = goalWhy.trim();
 
-      onComplete({
-        name: name.trim() || screening?.name || "Friend",
-        goal: goal.trim(),
-        struggle: struggle.trim(),
-        goalWhy: trimmedGoalWhy,
-        personalAnchorInterpretation:
-          personalAnchorInterpretation ??
-          buildLocalFallbackInterpretation({
-            goal,
-            struggle,
-            goalWhy,
-          }),
-      });
+      setSubmitting(true);
+      setPersistError(null);
+
+      try {
+        const result = await onComplete({
+          name: name.trim() || screening?.name || "Friend",
+          goal: goal.trim(),
+          struggle: struggle.trim(),
+          goalWhy: trimmedGoalWhy,
+          personalAnchorInterpretation:
+            personalAnchorInterpretation ??
+            buildLocalFallbackInterpretation({
+              goal,
+              struggle,
+              goalWhy,
+            }),
+          interpretationSource: interpretationSource ?? "FALLBACK",
+          anchors: cleanedAnchors,
+        });
+
+        if (!result.ok) {
+          // Keep current input (goal/struggle/why/anchors all remain in
+          // state) — the user should not have to retype anything to retry.
+          setPersistError(result.message);
+        }
+      } finally {
+        setSubmitting(false);
+      }
 
       return;
     }
@@ -607,7 +653,8 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                       onClick={() => {
                         didGenerateRef.current = false;
                         setPersonalAnchorInterpretation(null);
-                        setAnchors([{ id: makeId("anchor"), text: "" }]);
+                        setInterpretationSource(null);
+                        setAnchors([{ id: makeId("anchor"), text: "", source: "USER" }]);
                         runAIGeneration();
                       }}
                       disabled={aiLoading}
@@ -677,8 +724,17 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                   </div>
                 )}
 
-                <PrimaryBtn onClick={handleNext} disabled={!canContinue || aiLoading}>
-                  Begin
+                {persistError && (
+                  <div
+                    role="alert"
+                    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                  >
+                    {persistError}
+                  </div>
+                )}
+
+                <PrimaryBtn onClick={handleNext} disabled={!canContinue || aiLoading || submitting}>
+                  {submitting ? "Saving…" : "Begin"}
                 </PrimaryBtn>
               </div>
             )}

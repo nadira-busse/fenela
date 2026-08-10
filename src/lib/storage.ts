@@ -1,4 +1,5 @@
 import { assertSafeAnchorList } from "./safety";
+import type { AnchorSource } from "@/types/CareAnchor";
 
 // ---------- Generic helpers ----------
 
@@ -38,6 +39,11 @@ export type ActiveTask = {
 export type DayState<TTaskHistoryItem = never> = {
   version: 3;
   dayKey: string;
+  // The persisted Goal this day state was built from (Phase 4B hardening,
+  // Defect A). Absent for the unauthenticated/local-only MVP1 path and for
+  // legacy day state saved before this field existed — both are treated as
+  // "no goal identity to check", not as a fabricated match.
+  goalId?: string;
   activeTasks: ActiveTask[];
   parkedTasks: ActiveTask[];
   taskHistory: TTaskHistoryItem[];
@@ -70,11 +76,28 @@ export const saveDayState = <TTaskHistoryItem = never>(state: DayState<TTaskHist
 
 export const clearDayState = () => removeFromStorage(DAY_STATE_KEY);
 
+// Extracted so the reuse-vs-rebuild decision (Phase 4B hardening, Defect A)
+// is unit-testable on its own — CoachingScreen.tsx has no render-level test
+// coverage in this repo (no RTL/jsdom dependency). Day state may only be
+// reused when it is from today AND belongs to the same persisted Goal.
+// `goalId` is `undefined` for the unauthenticated/local-only MVP1 path and
+// for legacy day state saved before this field existed; both sides being
+// `undefined` compares equal, preserving the original dayKey-only
+// behavior for that path.
+export function isDayStateCurrent<TTaskHistoryItem>(
+  stored: DayState<TTaskHistoryItem> | null,
+  todayKey: string,
+  goalId: string | undefined
+): stored is DayState<TTaskHistoryItem> {
+  return stored !== null && stored.dayKey === todayKey && stored.goalId === goalId;
+}
+
 // ---------- Care Anchors ----------
 
 export const CARE_ANCHORS_KEY = "careAnchors";
 
-export type StoredCareAnchor = string | { text?: string };
+// Plain strings are legacy/pre-Phase-4B shape and carry no provenance.
+export type StoredCareAnchor = string | { text?: string; source?: AnchorSource };
 
 export const loadCareAnchors = (): StoredCareAnchor[] =>
   loadFromStorage<StoredCareAnchor[]>(CARE_ANCHORS_KEY, []);
@@ -91,6 +114,27 @@ function getAnchorText(anchor: unknown) {
   return String(anchor ?? "");
 }
 
+// No recorded source (a plain string, or an object that predates Phase 4B
+// provenance tracking) defaults to USER — the safest assumption, since it
+// is never persisted as AI/FALLBACK without the app having actually
+// recorded that provenance.
+export function getAnchorSource(anchor: unknown): AnchorSource {
+  if (
+    anchor &&
+    typeof anchor === "object" &&
+    "source" in anchor &&
+    (anchor as { source?: unknown }).source
+  ) {
+    const source = (anchor as { source?: unknown }).source;
+
+    if (source === "USER" || source === "AI" || source === "FALLBACK") {
+      return source;
+    }
+  }
+
+  return "USER";
+}
+
 function getAnchorTexts(anchors: StoredCareAnchor[]) {
   return anchors.map(getAnchorText);
 }
@@ -100,12 +144,17 @@ export const saveCareAnchors = (anchors: StoredCareAnchor[]) => {
   saveToStorage(CARE_ANCHORS_KEY, anchors);
 };
 
-export const createDayStateFromAnchors = (anchors: StoredCareAnchor[]): DayState => {
-  assertSafeAnchorList(getAnchorTexts(anchors));
+export const createDayStateFromAnchors = (
+  anchors: StoredCareAnchor[],
+  goalId?: string
+): DayState => {
+  const nonEmptyAnchors = anchors.filter((anchor) => getAnchorText(anchor).trim().length > 0);
+
+  assertSafeAnchorList(getAnchorTexts(nonEmptyAnchors));
 
   const todayKey = getTodayKey();
 
-  const activeTasks = anchors.map((anchor, idx) => ({
+  const activeTasks = nonEmptyAnchors.map((anchor, idx) => ({
     id: `a${idx + 1}`,
     text: getAnchorText(anchor),
     pauseCount: 0,
@@ -114,6 +163,7 @@ export const createDayStateFromAnchors = (anchors: StoredCareAnchor[]): DayState
   return {
     version: 3,
     dayKey: todayKey,
+    goalId,
     activeTasks,
     parkedTasks: [],
     taskHistory: [],

@@ -359,7 +359,23 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_active_goal_with_anchors: {
+        Args: {
+          p_anchors: Json;
+          p_initial_struggle: string;
+          p_interpretation_source: string;
+          p_personal_anchor_interpretation: Json;
+          p_title: string;
+          p_why: string;
+        };
+        Returns: {
+          anchor_id: string;
+          anchor_position: number;
+          anchor_source: string;
+          anchor_text: string;
+          goal_id: string;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { OWNER_MARKER_KEY, OWNED_STORAGE_KEYS } from "@/lib/localOwner";
 import { syncAuthenticatedLocalState, LS_SCREENING_DONE_KEY } from "./authenticatedLocalSync";
+import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
 
 // src/lib/storage.ts checks `typeof window` and calls the bare `localStorage`
 // global; src/lib/screeningStorage.ts calls `window.localStorage` directly.
@@ -36,6 +37,18 @@ const dbPreference = {
   antiHelp: ["PRESSURE" as const],
 };
 
+const activeGoal: ActiveGoalWithAnchors = {
+  id: "goal-1",
+  title: "Walk daily",
+  why: "Feel steadier",
+  initialStruggle: "Low energy",
+  personalAnchorInterpretation: null,
+  anchors: [
+    { id: "anchor-2", text: "Second anchor", source: "AI", position: 2 },
+    { id: "anchor-1", text: "First anchor", source: "USER", position: 1 },
+  ],
+};
+
 beforeEach(() => {
   fakeLocalStorage = createFakeLocalStorage();
   vi.stubGlobal("window", { localStorage: fakeLocalStorage });
@@ -52,7 +65,7 @@ describe("syncAuthenticatedLocalState", () => {
     fakeLocalStorage._store.set("fenela:intake", JSON.stringify({ goal: "A's goal" }));
     fakeLocalStorage._store.set("careAnchors", JSON.stringify(["A's anchor"]));
 
-    syncAuthenticatedLocalState(USER_B, dbPreference);
+    syncAuthenticatedLocalState(USER_B, dbPreference, null);
 
     // A's foreign state is gone.
     expect(fakeLocalStorage._store.has("fenela:intake")).toBe(false);
@@ -70,7 +83,7 @@ describe("syncAuthenticatedLocalState", () => {
   });
 
   it("does not repopulate the screening cache when there is no DB preference yet", () => {
-    syncAuthenticatedLocalState(USER_A, null);
+    syncAuthenticatedLocalState(USER_A, null, null);
 
     expect(fakeLocalStorage._store.get(OWNER_MARKER_KEY)).toBe(JSON.stringify(USER_A));
     expect(fakeLocalStorage._store.has("fenela:screening:v1")).toBe(false);
@@ -96,7 +109,7 @@ describe("syncAuthenticatedLocalState", () => {
       })
     );
 
-    syncAuthenticatedLocalState(USER_A, dbPreference);
+    syncAuthenticatedLocalState(USER_A, dbPreference, null);
 
     const screening = JSON.parse(fakeLocalStorage._store.get("fenela:screening:v1")!);
     expect(screening.name).toBe("Nadira"); // refreshed from DB
@@ -110,10 +123,45 @@ describe("syncAuthenticatedLocalState", () => {
       fakeLocalStorage._store.set(key, "1");
     }
 
-    syncAuthenticatedLocalState(USER_B, null);
+    syncAuthenticatedLocalState(USER_B, null, null);
 
     for (const key of OWNED_STORAGE_KEYS) {
       expect(fakeLocalStorage._store.has(key)).toBe(false);
     }
+  });
+
+  it("bridges the active goal + anchors into the intake/careAnchors compatibility cache, ordered by position", () => {
+    syncAuthenticatedLocalState(USER_A, dbPreference, activeGoal);
+
+    const intake = JSON.parse(fakeLocalStorage._store.get("fenela:intake")!);
+    expect(intake).toEqual({
+      name: "Nadira",
+      goal: "Walk daily",
+      struggle: "Low energy",
+      goalWhy: "Feel steadier",
+      personalAnchorInterpretation: undefined,
+    });
+
+    const careAnchors = JSON.parse(fakeLocalStorage._store.get("careAnchors")!);
+    expect(careAnchors).toEqual([
+      { id: "anchor-1", text: "First anchor", source: "USER" },
+      { id: "anchor-2", text: "Second anchor", source: "AI" },
+    ]);
+  });
+
+  it("clears stale local intake/careAnchors when the DB has no active goal, even for the same owner", () => {
+    fakeLocalStorage._store.set(OWNER_MARKER_KEY, JSON.stringify(USER_A));
+    fakeLocalStorage._store.set(
+      "fenela:intake",
+      JSON.stringify({ goal: "An old, now-archived goal" })
+    );
+    fakeLocalStorage._store.set("careAnchors", JSON.stringify(["stale anchor"]));
+
+    // Same owner (no ownership reset triggered), but the DB now has no
+    // ACTIVE goal — e.g. archived from a different device/session.
+    syncAuthenticatedLocalState(USER_A, dbPreference, null);
+
+    expect(fakeLocalStorage._store.has("fenela:intake")).toBe(false);
+    expect(fakeLocalStorage._store.has("careAnchors")).toBe(false);
   });
 });

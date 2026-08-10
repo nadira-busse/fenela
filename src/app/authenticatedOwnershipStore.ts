@@ -2,6 +2,7 @@ import {
   syncAuthenticatedLocalState,
   type PersistedPreferenceFields,
 } from "./authenticatedLocalSync";
+import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
 
 type Listener = () => void;
 
@@ -11,7 +12,8 @@ class AuthenticatedOwnershipStore {
 
   constructor(
     private readonly userId: string,
-    private readonly dbPreference: PersistedPreferenceFields | null
+    private readonly dbPreference: PersistedPreferenceFields | null,
+    private readonly activeGoal: ActiveGoalWithAnchors | null
   ) {}
 
   subscribe = (listener: Listener) => {
@@ -26,7 +28,7 @@ class AuthenticatedOwnershipStore {
   sync = () => {
     if (this.ready) return;
 
-    syncAuthenticatedLocalState(this.userId, this.dbPreference);
+    syncAuthenticatedLocalState(this.userId, this.dbPreference, this.activeGoal);
     this.ready = true;
 
     for (const listener of this.listeners) {
@@ -37,7 +39,8 @@ class AuthenticatedOwnershipStore {
 
 export function createAuthenticatedOwnershipStore(
   userId: string,
-  dbPreference: PersistedPreferenceFields | null
+  dbPreference: PersistedPreferenceFields | null,
+  activeGoal: ActiveGoalWithAnchors | null
 ) {
-  return new AuthenticatedOwnershipStore(userId, dbPreference);
+  return new AuthenticatedOwnershipStore(userId, dbPreference, activeGoal);
 }

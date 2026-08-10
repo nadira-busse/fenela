@@ -2,36 +2,41 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import ScreeningScreen from "./components/ScreeningScreen";
-import IntakeScreen from "./components/IntakeScreen";
+import IntakeScreen, {
+  type IntakeCompletionData,
+  type IntakeCompletionResult,
+} from "./components/IntakeScreen";
 import CoachingScreen from "./components/CoachingScreen";
 import AuthGateScreen from "./components/AuthGateScreen";
-import { PersonalAnchorInterpretation } from "@/types/intake";
 import {
   loadFromStorage,
   saveToStorage,
   removeFromStorage,
   loadCareAnchors,
+  saveCareAnchors,
   createDayStateFromAnchors,
   saveDayState,
   clearDayState,
+  CARE_ANCHORS_KEY,
 } from "@/lib/storage";
-import { LS_SCREENING_DONE_KEY, type PersistedPreferenceFields } from "./authenticatedLocalSync";
+import {
+  LS_SCREENING_DONE_KEY,
+  LS_INTAKE_KEY,
+  type PersistedPreferenceFields,
+} from "./authenticatedLocalSync";
 import { createAuthenticatedOwnershipStore } from "./authenticatedOwnershipStore";
-
-type Intake = {
-  name: string;
-  goal: string;
-  struggle: string;
-  goalWhy: string;
-  personalAnchorInterpretation?: PersonalAnchorInterpretation;
-};
+import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
+import { createGoalWithAnchorsAction } from "@/server/goals/createGoalWithAnchorsAction";
+import { archiveActiveGoalAction } from "@/server/goals/archiveActiveGoalAction";
+import { performNewGoalReset } from "./newGoalReset";
+import { performIntakeCompletion, type Intake } from "./intakeCompletion";
 
 type Props = {
   userId: string | null;
   dbPreference: PersistedPreferenceFields | null;
+  activeGoal: ActiveGoalWithAnchors | null;
 };
 
-const LS_INTAKE_KEY = "fenela:intake";
 const LEGACY_DAYSTATE_KEY = "anchor:dayState";
 const ROOT_PATH = "/";
 
@@ -84,7 +89,7 @@ function getOwnershipServerSnapshot() {
   return false;
 }
 
-export default function HomeClient({ userId, dbPreference }: Props) {
+export default function HomeClient({ userId, dbPreference, activeGoal }: Props) {
   const isAuthenticated = userId !== null;
 
   const hydrated = useSyncExternalStore(
@@ -97,15 +102,26 @@ export default function HomeClient({ userId, dbPreference }: Props) {
 
   const [intakeOverride, setIntakeOverride] = useState<Intake | null | undefined>(undefined);
 
+  // Same three-state override pattern as intakeOverride: undefined = defer
+  // to the `activeGoal` prop, null = explicitly no goal (just archived),
+  // a string = explicitly this goal (just created) — needed because the
+  // server-provided `activeGoal` prop cannot reflect a mutation that just
+  // happened in this same client session (Phase 4B hardening, Defect A).
+  const [goalIdOverride, setGoalIdOverride] = useState<string | null | undefined>(undefined);
+
   // Keep name across "New Goal".
   const [identityNameOverride, setIdentityNameOverride] = useState<string | null>(null);
 
   // Force-remount CoachingScreen when restarting day.
   const [coachMountKey, setCoachMountKey] = useState(0);
 
+  // New Goal archive request state (Phase 4B hardening, Defect B).
+  const [archivingNewGoal, setArchivingNewGoal] = useState(false);
+  const [newGoalError, setNewGoalError] = useState<string | null>(null);
+
   const ownershipStore = useMemo(
-    () => (userId ? createAuthenticatedOwnershipStore(userId, dbPreference) : null),
-    [userId, dbPreference]
+    () => (userId ? createAuthenticatedOwnershipStore(userId, dbPreference, activeGoal) : null),
+    [userId, dbPreference, activeGoal]
   );
 
   const ownershipReady = useSyncExternalStore(
@@ -146,48 +162,87 @@ export default function HomeClient({ userId, dbPreference }: Props) {
   const intake = intakeOverride !== undefined ? intakeOverride : storedIntake;
   const identityName = identityNameOverride ?? storedIntake?.name ?? "";
 
+  // Same precedence as `intake`: an explicit override (just created/just
+  // archived, this session) wins over the server-provided `activeGoal`
+  // prop, which only reflects state as of the last server render.
+  const goalId = (goalIdOverride !== undefined ? goalIdOverride : activeGoal?.id) ?? undefined;
+
   const handleCompleteScreening = () => {
     setScreeningDoneOverride(true);
     saveToStorage(LS_SCREENING_DONE_KEY, true);
   };
 
-  const handleCompleteIntake = (data: Intake) => {
-    setIntakeOverride(data);
-    saveToStorage(LS_INTAKE_KEY, data);
+  // Goal data complete + final Anchor set chosen is the persistence
+  // boundary (Phase 4B §16) — not shown to the user until this succeeds
+  // (§17): for an authenticated user, the DB write happens first and the
+  // local compatibility cache/Coaching transition only proceed on success.
+  // Unauthenticated visitors keep the existing MVP1 local-only behavior.
+  const handleCompleteIntake = (data: IntakeCompletionData): Promise<IntakeCompletionResult> =>
+    performIntakeCompletion(userId, data, {
+      createGoalWithAnchors: createGoalWithAnchorsAction,
+      applyCompletedIntake: ({ goalId: newGoalId, intake, careAnchors }) => {
+        setIntakeOverride(intake);
+        saveToStorage(LS_INTAKE_KEY, intake);
+        saveCareAnchors(careAnchors);
+        setGoalIdOverride(newGoalId ?? null);
 
-    setIdentityNameOverride(data.name);
+        setIdentityNameOverride(intake.name);
 
-    const anchors = loadCareAnchors();
-    const freshDay = createDayStateFromAnchors(anchors);
-    saveDayState(freshDay);
+        const freshDay = createDayStateFromAnchors(careAnchors, newGoalId);
+        saveDayState(freshDay);
 
-    removeFromStorage(LEGACY_DAYSTATE_KEY);
+        removeFromStorage(LEGACY_DAYSTATE_KEY);
 
-    setCoachMountKey((key) => key + 1);
-  };
+        setCoachMountKey((key) => key + 1);
+      },
+    });
 
   const restartDay = () => {
     clearDayState();
     removeFromStorage(LEGACY_DAYSTATE_KEY);
 
     const anchors = loadCareAnchors();
-    const freshDay = createDayStateFromAnchors(anchors);
+    const freshDay = createDayStateFromAnchors(anchors, goalId);
     saveDayState(freshDay);
 
     setCoachMountKey((key) => key + 1);
   };
 
-  const resetEverything = () => {
-    // Keep screening. User guidance preferences should not be removed by a new goal.
-    clearDayState();
-    removeFromStorage(LEGACY_DAYSTATE_KEY);
+  // Archives the current ACTIVE goal in PostgreSQL before clearing local
+  // state (Phase 4B §14) — never deletes it, and never creates a
+  // replacement goal (the next completed Intake does that). If the archive
+  // fails, local state is deliberately left untouched and a calm error is
+  // shown near the New Goal action (Phase 4B hardening, Defect B) so the
+  // user isn't left wondering whether the button did anything. The actual
+  // archive-then-clear ordering lives in performNewGoalReset() so it stays
+  // testable outside this component.
+  const resetEverything = async () => {
+    if (archivingNewGoal) return;
 
-    removeFromStorage("careAnchors");
+    setArchivingNewGoal(true);
+    setNewGoalError(null);
 
-    removeFromStorage(LS_INTAKE_KEY);
-    setIntakeOverride(null);
+    const result = await performNewGoalReset(userId, {
+      archiveActiveGoal: archiveActiveGoalAction,
+      clearLocalGoalState: () => {
+        setGoalIdOverride(null);
 
-    setCoachMountKey((key) => key + 1);
+        // Keep screening. User guidance preferences should not be removed by a new goal.
+        clearDayState();
+        removeFromStorage(LEGACY_DAYSTATE_KEY);
+        removeFromStorage(CARE_ANCHORS_KEY);
+        removeFromStorage(LS_INTAKE_KEY);
+        setIntakeOverride(null);
+
+        setCoachMountKey((key) => key + 1);
+      },
+    });
+
+    setArchivingNewGoal(false);
+
+    if (!result.ok) {
+      setNewGoalError(result.message);
+    }
   };
 
   if (!hydrated || (isAuthenticated && !ownershipReady)) return null;
@@ -210,8 +265,11 @@ export default function HomeClient({ userId, dbPreference }: Props) {
         <CoachingScreen
           key={coachMountKey}
           intake={intake}
+          goalId={goalId}
           onResetEverything={resetEverything}
           onRestartDay={restartDay}
+          newGoalPending={archivingNewGoal}
+          newGoalError={newGoalError}
         />
       )}
     </>

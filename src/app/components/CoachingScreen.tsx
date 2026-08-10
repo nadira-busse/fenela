@@ -10,7 +10,8 @@ import {
   loadDayState,
   saveDayState,
   loadCareAnchors,
-  type StoredCareAnchor,
+  createDayStateFromAnchors,
+  isDayStateCurrent,
 } from "@/lib/storage";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { enablePushForCurrentDevice, getNotificationPermission } from "@/lib/pushClient";
@@ -30,8 +31,16 @@ interface CoachingScreenProps {
     goalWhy: string;
     personalAnchorInterpretation?: PersonalAnchorInterpretation;
   };
+  // The persisted Goal id this Coaching session belongs to (authenticated
+  // users only — Phase 4B hardening, Defect A). Undefined for the
+  // unauthenticated/local-only MVP1 path.
+  goalId?: string;
   onResetEverything: () => void;
   onRestartDay: () => void;
+  // New Goal archive state (Phase 4B hardening, Defect B) — owned by
+  // HomeClient, which runs the actual archive request.
+  newGoalPending?: boolean;
+  newGoalError?: string | null;
 }
 
 type Task = {
@@ -169,16 +178,19 @@ function ActionBtn({
   children,
   onClick,
   variant = "primary",
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   variant?: ActionBtnVariant;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full py-5 rounded-2xl text-base font-bold mb-3 transition-transform active:scale-95 ${
+      disabled={disabled}
+      className={`w-full py-5 rounded-2xl text-base font-bold mb-3 transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${
         variant === "primary"
           ? "bg-[var(--cta-primary)] text-white"
           : "bg-[var(--cta-secondary)] text-[var(--cta-secondary-text)]"
@@ -331,8 +343,11 @@ function ReminderSettingsLink({
 
 export default function CoachingScreen({
   intake,
+  goalId,
   onResetEverything,
   onRestartDay,
+  newGoalPending = false,
+  newGoalError = null,
 }: CoachingScreenProps) {
   const todayKey = useMemo(() => getTodayKey(), []);
   const [hydrated, setHydrated] = useState(false);
@@ -379,7 +394,7 @@ export default function CoachingScreen({
   useEffect(() => {
     const stored = loadDayState<TaskHistoryItem>();
 
-    if (stored && stored.dayKey === todayKey) {
+    if (isDayStateCurrent(stored, todayKey, goalId)) {
       // Intentional: localStorage is only readable after mount, so this state
       // is deliberately set post-hydration (not derivable during render)
       // to avoid a server/client hydration mismatch.
@@ -389,16 +404,9 @@ export default function CoachingScreen({
       setTaskHistory(stored.taskHistory || []);
     } else {
       const anchors = loadCareAnchors();
+      const freshDay = createDayStateFromAnchors(anchors, goalId);
 
-      const freshTasks = anchors
-        .map((anchor: StoredCareAnchor, index: number) => ({
-          id: `t-${index}`,
-          text: typeof anchor === "string" ? anchor : anchor.text || "",
-          pauseCount: 0,
-        }))
-        .filter((task) => task.text.trim().length > 0);
-
-      setActiveTasks(freshTasks);
+      setActiveTasks(freshDay.activeTasks);
     }
 
     const reminderTime = getStoredDailyReminderTime(screening);
@@ -414,7 +422,7 @@ export default function CoachingScreen({
     }
 
     setHydrated(true);
-  }, [todayKey, screening]);
+  }, [todayKey, screening, goalId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -422,11 +430,12 @@ export default function CoachingScreen({
     saveDayState({
       version: 3,
       dayKey: todayKey,
+      goalId,
       activeTasks,
       parkedTasks,
       taskHistory,
     });
-  }, [activeTasks, parkedTasks, taskHistory, hydrated, todayKey]);
+  }, [activeTasks, parkedTasks, taskHistory, hydrated, todayKey, goalId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -974,10 +983,16 @@ export default function CoachingScreen({
               <ActionBtn onClick={onRestartDay} variant="ghost">
                 Reset today
               </ActionBtn>
-              <ActionBtn onClick={onResetEverything} variant="ghost">
-                New goal
+              <ActionBtn onClick={onResetEverything} variant="ghost" disabled={newGoalPending}>
+                {newGoalPending ? "Starting…" : "New goal"}
               </ActionBtn>
             </div>
+
+            {newGoalError ? (
+              <p role="alert" className="text-xs leading-relaxed text-red-700 text-center">
+                {newGoalError}
+              </p>
+            ) : null}
           </div>
         </Card>
       </Shell>
