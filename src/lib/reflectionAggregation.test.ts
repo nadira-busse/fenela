@@ -89,7 +89,7 @@ describe("aggregateReflectionFacts", () => {
       postponedCount: 0,
       parkedCount: 0,
     });
-    expect(facts.friction).toEqual({ entriesCount: 0, reasons: [] });
+    expect(facts.friction).toEqual({ entriesCount: 0 });
   });
 
   it("preserves the period passed in unchanged", () => {
@@ -103,7 +103,7 @@ describe("aggregateReflectionFacts", () => {
   });
 
   describe("friction", () => {
-    it("counts entries and preserves raw reason text", () => {
+    it("counts entries without persisting the raw reason text (Phase 4H hardening — no current consumer)", () => {
       const facts = aggregateReflectionFacts({
         period: PERIOD,
         actionEvents: [],
@@ -114,10 +114,10 @@ describe("aggregateReflectionFacts", () => {
       });
 
       expect(facts.friction.entriesCount).toBe(2);
-      expect(facts.friction.reasons).toEqual(["It felt too big", "Low energy today"]);
+      expect(facts.friction).not.toHaveProperty("reasons");
     });
 
-    it("preserves exact duplicate reason text as separate factual entries", () => {
+    it("counts exact duplicate reason submissions as separate factual entries", () => {
       const facts = aggregateReflectionFacts({
         period: PERIOD,
         actionEvents: [],
@@ -128,31 +128,16 @@ describe("aggregateReflectionFacts", () => {
       });
 
       expect(facts.friction.entriesCount).toBe(2);
-      expect(facts.friction.reasons).toEqual(["Low energy", "Low energy"]);
     });
 
-    it("orders reasons by occurred_at ascending regardless of input order", () => {
-      const facts = aggregateReflectionFacts({
-        period: PERIOD,
-        actionEvents: [],
-        frictionEvents: [
-          frictionEvent("third", "2026-03-18", "2026-03-18T08:00:00Z"),
-          frictionEvent("first", "2026-03-16", "2026-03-16T08:00:00Z"),
-          frictionEvent("second", "2026-03-17", "2026-03-17T08:00:00Z"),
-        ],
-      });
-
-      expect(facts.friction.reasons).toEqual(["first", "second", "third"]);
-    });
-
-    it("never introduces a classification/sentiment field", () => {
+    it("never introduces a classification/sentiment/raw-text field", () => {
       const facts = aggregateReflectionFacts({
         period: PERIOD,
         actionEvents: [],
         frictionEvents: [frictionEvent("Low energy", "2026-03-16", "2026-03-16T08:00:00Z")],
       });
 
-      expect(Object.keys(facts.friction).sort()).toEqual(["entriesCount", "reasons"]);
+      expect(Object.keys(facts.friction).sort()).toEqual(["entriesCount"]);
     });
   });
 

@@ -34,7 +34,6 @@ export const OWNED_STORAGE_KEYS = [
   "fenela:intake",
   "dayStateV3",
   "careAnchors",
-  "fenela:dayLogs",
   "anchor:dayState",
   // Phase 4F: which weekly Reflection this device has already shown — see
   // src/app/reflections/weeklyReflectionLocalState.ts.

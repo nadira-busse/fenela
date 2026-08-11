@@ -11,7 +11,7 @@ const PERIOD = {
 
 function makeFacts(
   overrides: Partial<ReflectionFacts["activity"]> = {},
-  reasons: string[] = []
+  frictionEntriesCount = 0
 ): ReflectionFacts {
   return {
     period: PERIOD,
@@ -24,8 +24,7 @@ function makeFacts(
       ...overrides,
     },
     friction: {
-      entriesCount: reasons.length,
-      reasons,
+      entriesCount: frictionEntriesCount,
     },
   };
 }
@@ -46,10 +45,7 @@ describe("renderDeterministicReflectionText", () => {
   });
 
   it("renders a representative WEEKLY-shaped summary", () => {
-    const facts = makeFacts({ activeDays: 3, completedCount: 4, postponedCount: 2 }, [
-      "It felt too big",
-      "Low energy",
-    ]);
+    const facts = makeFacts({ activeDays: 3, completedCount: 4, postponedCount: 2 }, 2);
 
     expect(renderDeterministicReflectionText(facts)).toBe(
       "You came back on 3 days.\n" +
@@ -73,7 +69,7 @@ describe("renderDeterministicReflectionText", () => {
         postponedCount: 5,
         parkedCount: 2,
       },
-      friction: { entriesCount: 3, reasons: ["a", "b", "c"] },
+      friction: { entriesCount: 3 },
     };
 
     expect(renderDeterministicReflectionText(facts)).toBe(
@@ -85,7 +81,7 @@ describe("renderDeterministicReflectionText", () => {
   });
 
   it("uses singular wording for count-of-one values", () => {
-    const facts = makeFacts({ activeDays: 1, completedCount: 1, parkedCount: 1 }, ["one reason"]);
+    const facts = makeFacts({ activeDays: 1, completedCount: 1, parkedCount: 1 }, 1);
 
     expect(renderDeterministicReflectionText(facts)).toBe(
       "You came back on 1 day.\n" +
@@ -98,7 +94,7 @@ describe("renderDeterministicReflectionText", () => {
   it("never includes a percentage, rate, or score", () => {
     const facts = makeFacts(
       { activeDays: 5, completedCount: 3, postponedCount: 3, parkedCount: 1 },
-      ["x"]
+      1
     );
     const text = renderDeterministicReflectionText(facts);
 
@@ -112,15 +108,10 @@ describe("renderDeterministicReflectionText", () => {
     expect(text).not.toMatch(/AI|model|GPT/i);
   });
 
-  it("includes friction reason presence as a factual count only, never rewording or interpreting the text itself", () => {
-    const facts = makeFacts({}, ["I felt like giving up entirely"]);
+  it("includes friction presence as a factual count only — ReflectionFacts carries no raw reason text to echo (Phase 4H hardening)", () => {
+    const facts = makeFacts({}, 1);
     const text = renderDeterministicReflectionText(facts);
 
-    // The raw reason text itself is never echoed/interpreted in the
-    // rendered summary — only counted. It remains available verbatim in
-    // ReflectionFacts.friction.reasons / facts_snapshot for anyone reading
-    // the persisted record, not paraphrased into the prose here.
-    expect(text).not.toContain("I felt like giving up entirely");
     expect(text).toContain("1 moment of friction");
   });
 });

@@ -7,7 +7,17 @@
 //
 // Deliberately excluded, per ADR-005/Phase 4E §29: completion percentages,
 // success rates, streaks, rankings, inferred trends, friction
-// classification, sentiment. Only counts and raw stored text.
+// classification, sentiment. Only counts — no raw text.
+//
+// Phase 4H hardening: this previously also copied every raw
+// friction_events.reason string into `friction.reasons`. The deterministic
+// renderer (reflectionRenderer.ts) never used it — only
+// `friction.entriesCount` — so it was a second, dormant persisted copy of
+// text already canonically stored in friction_events.reason, with no
+// current product consumer. Removed rather than kept for a hypothetical
+// future (MVP3 AI-assisted wording is not implemented); that feature, if
+// built, can read friction_events directly the same way this function
+// already does.
 
 import type { ActionEventType } from "@/lib/eventMapping";
 import type { ReflectionPeriod } from "@/lib/reflectionPeriod";
@@ -27,10 +37,6 @@ export type ReflectionFacts = {
   };
   friction: {
     entriesCount: number;
-    // Raw, factual, stored user text — occurred_at ascending (§11).
-    // Exact duplicates from separate events remain duplicated; nothing is
-    // deduplicated, classified, or reworded.
-    reasons: string[];
   };
 };
 
@@ -87,12 +93,11 @@ export function aggregateReflectionFacts(input: AggregateReflectionFactsInput): 
     }
   }
 
-  const sortedFrictionEvents = [...input.frictionEvents].sort(byOccurredAtAscending);
-  const reasons: string[] = [];
-
-  for (const event of sortedFrictionEvents) {
+  // No longer sorted by occurred_at (Phase 4H hardening): that ordering
+  // only existed to keep the now-removed `reasons` array chronological —
+  // activeDates (a Set) and entriesCount are both order-independent.
+  for (const event of input.frictionEvents) {
     activeDates.add(event.localDate);
-    reasons.push(event.reason);
   }
 
   return {
@@ -105,8 +110,7 @@ export function aggregateReflectionFacts(input: AggregateReflectionFactsInput): 
       parkedCount,
     },
     friction: {
-      entriesCount: sortedFrictionEvents.length,
-      reasons,
+      entriesCount: input.frictionEvents.length,
     },
   };
 }

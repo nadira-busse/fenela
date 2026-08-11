@@ -138,9 +138,10 @@ These routes create and cancel reminder jobs.
 
 ```text
 /api/cron/push
+/api/cron/retention
 ```
 
-This server-to-server route reads due reminder jobs and sends push notifications.
+`/api/cron/push` reads due reminder jobs and sends push notifications. `/api/cron/retention` runs the 12-month inactivity retention batch: it enumerates Auth users, finds accounts with no authenticated Fenéla activity in the last 12 months or more, and deletes each one through the same canonical deletion core user-initiated deletion uses. Both routes share the same `CRON_SECRET`-protected system boundary (`src/lib/cronAuth.ts`) and are not reachable through any authenticated user session or browser UI.
 
 ### Push setup
 
@@ -155,16 +156,17 @@ These routes provide the public VAPID key and store browser push subscriptions.
 
 The routes below are the current product surface and remain unauthenticated by design — they rely on validation, bounded payloads and rate limiting rather than verified user identity. A separate technical authentication foundation (Supabase Auth) now exists at `/auth`, `/auth/callback` and `/auth/signout` (see "Accepted MVP2 identity and persistence direction" below), but no route in this table reads or requires that session yet.
 
-| Route                            | Method | Exposure         | Data effect                                                        | Cost or storage effect    | Protection                                                                              |
-| -------------------------------- | ------ | ---------------- | ------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------- |
-| `/api/ai/anchors`                | `POST` | Public           | Does not persist user content; may write rate-limit state          | Can use OpenAI credits    | Intake limits, safety checks, device-based rate limiting and external spending controls |
-| `/api/push/public-key`           | `GET`  | Public read-only | Returns the public VAPID key                                       | No storage growth         | Returns only public configuration                                                       |
-| `/api/push/subscribe`            | `POST` | Public write     | Stores or replaces a device subscription                           | Can create KV records     | Input validation and device/IP rate limiting                                            |
-| `/api/jobs/schedule-daily-start` | `POST` | Public write     | Replaces and stores a daily reminder job                           | Can create KV records     | Existing subscription requirement and device rate limiting                              |
-| `/api/jobs/schedule-reminder`    | `POST` | Public write     | Stores a task reminder job                                         | Can create KV records     | Payload limits and device/IP rate limiting                                              |
-| `/api/jobs/cancel`               | `POST` | Public write     | Deletes one device job                                             | No storage growth         | Requires a device ID and job ID                                                         |
-| `/api/jobs/cancel-daily-start`   | `POST` | Public write     | Deletes the active daily reminder job and pointer                  | No storage growth         | Requires a device ID                                                                    |
-| `/api/cron/push`                 | `GET`  | Server-to-server | Reads, deletes and reschedules jobs, then sends push notifications | Can trigger push delivery | Requires `CRON_SECRET` through Bearer authorization                                     |
+| Route                            | Method | Exposure         | Data effect                                                              | Cost or storage effect                          | Protection                                                                              |
+| -------------------------------- | ------ | ---------------- | ------------------------------------------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `/api/ai/anchors`                | `POST` | Public           | Does not persist user content; may write rate-limit state                | Can use OpenAI credits                          | Intake limits, safety checks, device-based rate limiting and external spending controls |
+| `/api/push/public-key`           | `GET`  | Public read-only | Returns the public VAPID key                                             | No storage growth                               | Returns only public configuration                                                       |
+| `/api/push/subscribe`            | `POST` | Public write     | Stores or replaces a device subscription                                 | Can create KV records                           | Input validation and device/IP rate limiting                                            |
+| `/api/jobs/schedule-daily-start` | `POST` | Public write     | Replaces and stores a daily reminder job                                 | Can create KV records                           | Existing subscription requirement and device rate limiting                              |
+| `/api/jobs/schedule-reminder`    | `POST` | Public write     | Stores a task reminder job                                               | Can create KV records                           | Payload limits and device/IP rate limiting                                              |
+| `/api/jobs/cancel`               | `POST` | Public write     | Deletes one device job                                                   | No storage growth                               | Requires a device ID and job ID                                                         |
+| `/api/jobs/cancel-daily-start`   | `POST` | Public write     | Deletes the active daily reminder job and pointer                        | No storage growth                               | Requires a device ID                                                                    |
+| `/api/cron/push`                 | `GET`  | Server-to-server | Reads, deletes and reschedules jobs, then sends push notifications       | Can trigger push delivery                       | Requires `CRON_SECRET` through Bearer authorization                                     |
+| `/api/cron/retention`            | `GET`  | Server-to-server | Deletes accounts inactive for 12+ months via the canonical deletion core | Deletes account-owned rows for expired accounts | Requires `CRON_SECRET` through Bearer authorization                                     |
 
 Device IDs identify a browser or installed PWA. They do not prove user identity.
 
@@ -187,7 +189,7 @@ The shared rate limiter uses the existing KV store and fails open when KV is una
 
 Account-level OpenAI spending limits remain the final cost backstop outside the repository.
 
-The cron route is not public application traffic. It requires `CRON_SECRET` and rejects unauthorized requests.
+Neither cron route is public application traffic. Both require `CRON_SECRET` and reject unauthorized requests.
 
 ## Reminder and push architecture
 
@@ -291,7 +293,7 @@ MVP1 used local and device-based state without requiring an account. MVP2 change
 
 Authenticated product flows now derive identity server-side through `requireUser()` and persist user-owned preferences, reminder settings, Goals, Anchors, ActionEvents and FrictionEvents in PostgreSQL with RLS-backed ownership boundaries. Browser-local state remains only where it still serves compatibility or device-specific UI behavior.
 
-Account deletion, retention policy and the final production privacy lifecycle remain separate later work.
+Account deletion (user-initiated) and a 12-month inactivity retention policy are both implemented, sharing one canonical deletion core. See [Privacy and data lifecycle](../docs/product/privacy-data-lifecycle.md) for the full explanation and the "Cron processing" route group below for the technical entry points.
 
 ### Implemented MVP2 identity and persistence direction
 
@@ -332,12 +334,10 @@ The AI-specific limits are documented in [AI and ethical-use guardrails](../docs
 
 ## Remaining MVP2 architecture work
 
-ADR-003 through ADR-005 define the accepted direction for authenticated persistence, reminder/device ownership and deterministic reflection history. The repository already implements the identity, persistence, reminder/device ownership and factual-history foundations; reflection persistence is completed and reviewed as a separate phase before product presentation is added.
+ADR-003 through ADR-005 define the accepted direction for authenticated persistence, reminder/device ownership and deterministic reflection history. The repository implements the identity, persistence, reminder/device ownership, factual-history and deterministic reflection foundations, plus account deletion and the 12-month inactivity retention policy documented in [Privacy and data lifecycle](../docs/product/privacy-data-lifecycle.md).
 
 Remaining work is intentionally narrower and includes:
 
-- account deletion and retention behavior;
-- final privacy/data-purpose documentation;
 - production configuration and deployment acceptance;
 - multi-device reminder behavior only if a real product need justifies it;
 - optional AI wording only downstream of deterministic ReflectionFacts.
@@ -354,6 +354,7 @@ The architecture does not prepare for those features in advance. New abstraction
 
 - [MVP scope](../docs/product/mvp-scope.md)
 - [AI and ethical-use guardrails](../docs/product/ai-guardrails.md)
+- [Privacy and data lifecycle](../docs/product/privacy-data-lifecycle.md)
 - [Maintenance notes](../docs/technical/maintenance-notes.md)
 - [ADR-001: Optional AI-Assisted Anchors](../decisions/ADR-001-ai-assisted-anchors.md)
 - [ADR-002: Optional Reminders](../decisions/ADR-002-optional-reminders.md)

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildErrorAnchors,
   buildFallbackInterpretation,
+  buildPrompt,
+  buildRepairPrompt,
   safeParseAIResponse,
   sanitizeAndDedupeAnchors,
   validateAnchors,
@@ -142,5 +144,47 @@ describe("fallback builders", () => {
 
     expect(anchors).toHaveLength(3);
     expect(validateAnchors(anchors, 3).ok).toBe(true);
+  });
+});
+
+describe("prompt payload boundary (Phase 4H hardening)", () => {
+  it("buildPrompt does not send the user's display name to the model", () => {
+    const prompt = buildPrompt(baseRequest, 3);
+
+    expect(prompt).not.toContain("Test user");
+    expect(prompt).not.toMatch(/^name:/m);
+  });
+
+  it("buildPrompt still sends goal, why and struggle — grounding is unaffected by removing the name", () => {
+    const prompt = buildPrompt(baseRequest, 3);
+
+    expect(prompt).toContain("goal: finish my portfolio README");
+    expect(prompt).toContain("goalWhy: I want reviewers to understand my work quickly");
+    expect(prompt).toContain("struggle: I keep adding extra sections");
+  });
+
+  it("buildRepairPrompt does not send the user's display name to the model", () => {
+    const prompt = buildRepairPrompt({
+      body: baseRequest,
+      count: 3,
+      previousRaw: "",
+      validationErrors: ["Response was not valid JSON."],
+    });
+
+    expect(prompt).not.toContain("Test user");
+    expect(prompt).not.toMatch(/^name:/m);
+  });
+
+  it("buildRepairPrompt still sends goal, why and struggle", () => {
+    const prompt = buildRepairPrompt({
+      body: baseRequest,
+      count: 3,
+      previousRaw: "",
+      validationErrors: ["Response was not valid JSON."],
+    });
+
+    expect(prompt).toContain("goal: finish my portfolio README");
+    expect(prompt).toContain("goalWhy: I want reviewers to understand my work quickly");
+    expect(prompt).toContain("struggle: I keep adding extra sections");
   });
 });

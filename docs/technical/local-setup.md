@@ -116,12 +116,17 @@ After `npm run build`, the output should include the root page and the productio
 /
 /api/ai/anchors
 /api/cron/push
+/api/cron/retention
 /api/jobs/cancel
 /api/jobs/cancel-daily-start
 /api/jobs/schedule-daily-start
 /api/jobs/schedule-reminder
 /api/push/public-key
 /api/push/subscribe
+/api/push/unsubscribe
+/auth
+/auth/callback
+/auth/signout
 /manifest.webmanifest
 ```
 
@@ -129,7 +134,7 @@ No development-only, test or obsolete API routes should appear.
 
 ## 7. Supabase persistence and authentication (MVP2)
 
-MVP2 uses Supabase Auth + PostgreSQL for authenticated, user-owned persistence. The current repository includes schema/RLS, authenticated server identity, canonical persistence for user/reminder preferences and Goal/Anchor state, immutable ActionEvent/FrictionEvent history, and authenticated Device/PushSubscription ownership. Reflection persistence is developed separately under ADR-005.
+MVP2 uses Supabase Auth + PostgreSQL for authenticated, user-owned persistence. The current repository includes schema/RLS, authenticated server identity, canonical persistence for user/reminder preferences and Goal/Anchor state, immutable ActionEvent/FrictionEvent history, authenticated Device/PushSubscription ownership, deterministic reflection persistence (ADR-005), and account deletion with 12-month inactivity retention (see [Privacy and data lifecycle](../product/privacy-data-lifecycle.md)).
 
 ### Prerequisites
 

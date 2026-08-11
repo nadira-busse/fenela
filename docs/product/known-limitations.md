@@ -71,6 +71,15 @@ Validation, rate limiting and other abuse controls remain separate from authenti
 
 See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md) and [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md).
 
+## Account deletion and retention
+
+Users can permanently delete their account at any time from `/auth`. Accounts inactive for 12 months or more are also permanently deleted by a scheduled job, using the same deletion mechanism. Full behavior is documented in [Privacy and data lifecycle](privacy-data-lifecycle.md).
+
+Two accepted limitations of the current implementation:
+
+- No advance warning email is sent before 12-month inactivity deletion. Fenéla has no email-sending infrastructure today, and this is a deliberate scope decision rather than a technical gap being tracked.
+- The retention job scans Auth users in a single bounded, sequential run rather than a queueing platform built for unlimited scale. This is an accepted MVP2 engineering trade-off, not a currently binding real-world constraint.
+
 ## AI and safety limits
 
 AI is currently limited to generating anchor suggestions.

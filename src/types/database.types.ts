@@ -315,6 +315,21 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_activity: {
+        Row: {
+          last_active_at: string;
+          user_id: string;
+        };
+        Insert: {
+          last_active_at: string;
+          user_id: string;
+        };
+        Update: {
+          last_active_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_preferences: {
         Row: {
           action_trigger: string;

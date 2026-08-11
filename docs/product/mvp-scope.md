@@ -136,7 +136,7 @@ This infrastructure supports reminders but remains separate from the main user f
 
 For authenticated users, canonical user preferences, reminder preferences, Goals, Anchors and factual event history are persisted in PostgreSQL and scoped to the authenticated account. Devices and push subscriptions are also account-owned.
 
-Some UI/day-state compatibility data remains browser-local. Push subscriptions remain device-specific even though their ownership is authenticated. Full multi-device fanout and account lifecycle features are not part of the current MVP2 implementation.
+Some UI/day-state compatibility data remains browser-local. Push subscriptions remain device-specific even though their ownership is authenticated. Full multi-device fanout is not part of the current MVP2 implementation. Account lifecycle — user-initiated permanent account deletion and 12-month inactivity retention — is implemented; see [Privacy and data lifecycle](privacy-data-lifecycle.md).
 
 ### 10. Public documentation
 
@@ -173,7 +173,7 @@ A later version may add selected capabilities when they support a clear user nee
 
 ## MVP2 implementation status
 
-MVP2 is actively implemented in the repository. Authenticated user-owned persistence, historical ActionEvent/FrictionEvent data and reminder/device ownership are implemented and validated in the development branch. Deterministic weekly/monthly reflection persistence is being completed in the current development phase.
+MVP2 is actively implemented in the repository. Authenticated user-owned persistence, historical ActionEvent/FrictionEvent data, reminder/device ownership, deterministic weekly/monthly reflection persistence, and account deletion with 12-month inactivity retention are all implemented and validated in the development branch.
 
 The production deployment has not yet been updated to this final MVP2 state.
 
@@ -182,6 +182,8 @@ The governing decisions are documented in:
 - [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md)
 - [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
 - [ADR-005: Deterministic Reflection History](../../decisions/ADR-005-deterministic-reflection-history.md)
+
+Account deletion and data retention are documented in [Privacy and data lifecycle](privacy-data-lifecycle.md).
 
 MVP2 does not change the product boundary.
 

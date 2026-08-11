@@ -47,7 +47,7 @@ const MEANINGFUL_FACTS_SNAPSHOT = {
     postponedCount: 0,
     parkedCount: 0,
   },
-  friction: { entriesCount: 0, reasons: [] },
+  friction: { entriesCount: 0 },
 };
 
 const EMPTY_FACTS_SNAPSHOT = {
@@ -59,7 +59,7 @@ const EMPTY_FACTS_SNAPSHOT = {
     postponedCount: 0,
     parkedCount: 0,
   },
-  friction: { entriesCount: 0, reasons: [] },
+  friction: { entriesCount: 0 },
 };
 
 const FRICTION_ONLY_FACTS_SNAPSHOT = {
@@ -71,7 +71,7 @@ const FRICTION_ONLY_FACTS_SNAPSHOT = {
     postponedCount: 0,
     parkedCount: 0,
   },
-  friction: { entriesCount: 1, reasons: ["Too tired"] },
+  friction: { entriesCount: 1 },
 };
 
 const EXISTING_REFLECTION_ROW = {

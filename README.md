@@ -59,7 +59,7 @@ A short demo video is available here:
 
 Fenéla is a working application that I use myself.
 
-MVP1 established the core product loop. MVP2 is now actively implemented in the repository and adds authenticated, user-owned persistence, canonical reminder/device ownership and factual event history. Deterministic reflection persistence is being added in the current development phase.
+MVP1 established the core product loop. MVP2 is now actively implemented in the repository and adds authenticated, user-owned persistence, canonical reminder/device ownership, factual event history, deterministic reflection persistence, and account deletion with 12-month inactivity retention.
 
 The public production deployment has not yet been updated to this MVP2 repository state. Repository documentation therefore distinguishes between implemented and validated development work and functionality that is already available in the deployed application.
 
@@ -175,6 +175,7 @@ For a technical review, the suggested reading order is:
 Additional documentation:
 
 - [Known limitations](docs/product/known-limitations.md)
+- [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md)
 - [Local setup](docs/technical/local-setup.md)
 
 ## Author

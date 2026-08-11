@@ -209,33 +209,3 @@ export const createDayStateFromAnchors = (
     taskHistory: [],
   };
 };
-
-// ---------- Day Logs ----------
-
-export type DayLog = {
-  dayKey: string;
-  done: number;
-  parked: number;
-  parkedTasks: string[];
-  note?: string;
-  createdAtISO: string;
-};
-
-export const DAY_LOGS_KEY = "fenela:dayLogs";
-
-export const upsertDayLog = (log: DayLog) => {
-  const existing = loadFromStorage<DayLog[]>(DAY_LOGS_KEY, []);
-  const idx = existing.findIndex((item) => item.dayKey === log.dayKey);
-
-  if (idx >= 0) {
-    const next = [...existing];
-    next[idx] = log;
-    saveToStorage(DAY_LOGS_KEY, next);
-  } else {
-    saveToStorage(DAY_LOGS_KEY, [...existing, log]);
-  }
-};
-
-export const loadDayLogs = () => loadFromStorage<DayLog[]>(DAY_LOGS_KEY, []);
-
-export const clearDayLogs = () => removeFromStorage(DAY_LOGS_KEY);

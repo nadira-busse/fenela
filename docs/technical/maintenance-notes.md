@@ -19,6 +19,19 @@ The cron worker therefore:
 
 Transient delivery failures such as network errors, 429 responses or 5xx responses do not delete the subscription or Device row.
 
+## Account retention batch bound
+
+`/api/cron/retention` (see [Privacy and data lifecycle](../product/privacy-data-lifecycle.md)) scans Supabase Auth users page by page within a single invocation, bounded by `RETENTION_SCAN_MAX_PAGES` in `src/server/account/listInactiveAccountCandidates.ts` (currently 50 pages of 200 users, 10,000 accounts per run). If a run's user base ever exceeds that bound, the response reports `truncated: true` instead of silently scanning only part of the accounts — that signal should be watched if the account base grows.
+
+## Account activity signal (`user_activity`)
+
+Retention eligibility needs a server-observed "this account is actually being used" signal that advances on more than a fresh sign-in. That signal lives in its own table, `public.user_activity` (`user_id` primary key, `last_active_at`), not as a column on `user_preferences`:
+
+- every authenticated root-page request upserts the caller's own row (`src/server/account/touchOwnActivity.ts`), so the row exists from a user's very first authenticated request — before onboarding/`user_preferences` exists;
+- the write goes through the privileged admin client, not the normal session-scoped client — `authenticated` has no PostgreSQL grant on this table at all, so the timestamp the destructive retention decision depends on is never client-writable;
+- `service_role` has exactly `SELECT`, `INSERT`, `UPDATE` on this table (see `supabase/migrations/20260812120000_user_activity.sql`) — no `DELETE`; rows are removed only via the `auth.users` cascade, the same as every other account-owned table;
+- retention's effective activity signal is the more recent of `auth.users.last_sign_in_at` and `user_activity.last_active_at`; a missing `user_activity` row (or a missing/malformed value on either side) never counts as evidence of inactivity on its own — see `src/server/account/retentionPolicy.ts`.
+
 ## Maintenance scripts
 
 The repository contains two local maintenance scripts:

@@ -16,24 +16,12 @@ import { REMINDER_TIME_ZONE, nextZonedOccurrenceMs } from "@/lib/timezone";
 import { classifyPushError } from "@/lib/pushErrorClassification";
 import { deletePushSubscriptionByDeviceId } from "@/server/devices/deletePushSubscriptionByDeviceId";
 import { cleanupOperationalPushState } from "@/lib/pushOperationalCleanup";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 export const runtime = "nodejs";
 
 const SUB_KEY = (deviceId: string) => `push:sub:${deviceId}`;
 const DAILY_START_POINTER_KEY = (deviceId: string) => `push:dailyStart:jobId:${deviceId}`;
-
-function isAuthorizedCronRequest(req: NextRequest): boolean {
-  const expectedSecret = process.env.CRON_SECRET?.trim();
-
-  if (!expectedSecret) {
-    return false;
-  }
-
-  const authHeader = req.headers.get("authorization") ?? "";
-  const receivedToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-  return receivedToken === expectedSecret;
-}
 
 function getErrorMessage(err: unknown): string {
   if (typeof err === "string") return err;
