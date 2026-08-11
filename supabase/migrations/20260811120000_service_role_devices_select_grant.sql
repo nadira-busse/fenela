@@ -1,0 +1,24 @@
+-- Fenéla MVP2 — Phase 4G: service_role grant for privileged Device
+-- enumeration during account deletion.
+--
+-- Same root cause already fixed twice (push_subscriptions, reflections):
+-- BYPASSRLS lets service_role skip Row Level Security policy evaluation,
+-- but standard SQL GRANT/REVOKE table privileges are still enforced for
+-- every role, service_role included. supabase/migrations/
+-- 20260809120000_mvp2_persistence_foundation.sql only granted `devices`
+-- privileges to `authenticated`.
+--
+-- The account deletion core (src/server/devices/listDeviceIdsForUser.ts)
+-- must enumerate every Device a user owns before deleting their auth.users
+-- row. It uses the privileged admin client deliberately (not the normal
+-- RLS-scoped client) so the same trusted deletion core can later be reused
+-- by an inactivity-deletion path that has no browser session/cookies to
+-- scope a normal client to (Phase 4G scope: the reuse boundary must exist
+-- now, even though the inactivity path itself is not built in this phase).
+--
+-- Scoped to exactly SELECT on `devices` — the one read this enumeration
+-- step performs. Not INSERT/UPDATE/DELETE: device creation/touch stays on
+-- the normal authenticated RLS-scoped path (getOrCreateOwnDevice), and
+-- Device rows are deleted only via the auth.users cascade, never directly.
+
+grant select on public.devices to service_role;

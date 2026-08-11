@@ -66,4 +66,37 @@ describe("cleanupOperationalPushState", () => {
 
     await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({ cleanedJobs: 0 });
   });
+
+  describe("strict mode", () => {
+    it("propagates a failed zrange lookup instead of swallowing it", async () => {
+      kvZrange.mockRejectedValue(new Error("kv unavailable"));
+
+      await expect(cleanupOperationalPushState("device-a", { strict: true })).rejects.toThrow(
+        "kv unavailable"
+      );
+    });
+
+    it("propagates a failed per-job removal instead of swallowing it", async () => {
+      kvZrange.mockResolvedValue(["job-1"]);
+      removeJobForDevice.mockRejectedValue(new Error("job removal failed"));
+
+      await expect(cleanupOperationalPushState("device-a", { strict: true })).rejects.toThrow(
+        "job removal failed"
+      );
+    });
+
+    it("still succeeds in strict mode when every step succeeds", async () => {
+      kvZrange.mockResolvedValue(["job-1", "job-2"]);
+
+      const result = await cleanupOperationalPushState("device-a", { strict: true });
+
+      expect(result).toEqual({ cleanedJobs: 2 });
+    });
+
+    it("does not change default (non-strict) behavior", async () => {
+      kvZrange.mockRejectedValue(new Error("kv unavailable"));
+
+      await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({ cleanedJobs: 0 });
+    });
+  });
 });

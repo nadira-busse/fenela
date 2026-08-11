@@ -12,6 +12,18 @@
 // Idempotent: removing already-absent KV keys/set-members/zset-members is
 // a no-op in a Redis-compatible store, so calling this twice for the same
 // device is safe.
+//
+// `strict` (Phase 4G): the job-removal steps below were originally written
+// best-effort-only (job zset lookup and each per-job removal swallow their
+// own errors) because this helper's only prior callers — cron cleanup and
+// sign-out — must never let a KV hiccup block their own unrelated job
+// (draining due jobs, letting the user leave their session). Account
+// deletion has the opposite requirement (AGENTS.md Phase 4G): it must not
+// proceed to the irreversible auth.users delete while believing cleanup
+// succeeded when it didn't. `strict: true` lets a Device's zset lookup or
+// job removal failure propagate instead of being swallowed, without
+// changing the default (non-strict) behavior cron/sign-out already depend
+// on.
 
 import { getKvClient } from "@/lib/kv";
 import { DEVICES_SET_KEY, removeJobForDevice } from "@/lib/jobs";
@@ -25,6 +37,11 @@ export type CleanupOperationalPushStateOptions = {
   // device's job zset — e.g. the cron route's currently-failing job,
   // unioned defensively with whatever the zset lookup returns.
   additionalJobIds?: string[];
+
+  // Fail-closed mode for callers (account deletion) that must distinguish
+  // "cleanup actually succeeded" from "a step silently failed." Defaults to
+  // false so existing cron/sign-out best-effort semantics are unchanged.
+  strict?: boolean;
 };
 
 export async function cleanupOperationalPushState(
@@ -32,10 +49,10 @@ export async function cleanupOperationalPushState(
   options: CleanupOperationalPushStateOptions = {}
 ): Promise<{ cleanedJobs: number }> {
   const kv = getKvClient();
+  const strict = options.strict ?? false;
 
-  const zsetJobIds = (await kv
-    .zrange(DEVICE_JOBS_ZSET_KEY(deviceId), 0, -1)
-    .catch(() => [])) as string[];
+  const zsetLookup = kv.zrange(DEVICE_JOBS_ZSET_KEY(deviceId), 0, -1);
+  const zsetJobIds = (await (strict ? zsetLookup : zsetLookup.catch(() => []))) as string[];
 
   const uniqueJobIds = Array.from(
     new Set([...(options.additionalJobIds ?? []), ...(zsetJobIds ?? [])])
@@ -44,7 +61,8 @@ export async function cleanupOperationalPushState(
   let cleanedJobs = 0;
 
   for (const jobId of uniqueJobIds) {
-    await removeJobForDevice(deviceId, jobId).catch(() => {});
+    const removal = removeJobForDevice(deviceId, jobId);
+    await (strict ? removal : removal.catch(() => {}));
     cleanedJobs++;
   }
 

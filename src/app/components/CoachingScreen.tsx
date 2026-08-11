@@ -376,6 +376,24 @@ function ReminderSettingsLink({
   );
 }
 
+// The smallest possible authenticated account affordance (Phase 4G §2):
+// the normal product flow otherwise has no link at all to /auth, where
+// sign-out and account deletion live. Deliberately just a plain navigation
+// link (this repo has no next/link usage elsewhere) — not a settings
+// surface of its own, and not visually prominent, matching
+// ReminderSettingsLink's existing low-emphasis row styling immediately
+// above it.
+function AccountLink() {
+  return (
+    <a
+      href="/auth"
+      className="mt-3 flex w-full items-center justify-between rounded-2xl border border-black/5 bg-[var(--bg-app)] px-4 py-3 text-left transition-transform active:scale-[0.99]"
+    >
+      <span className="text-sm font-semibold text-[var(--text-muted)]">Account</span>
+    </a>
+  );
+}
+
 export default function CoachingScreen({
   intake,
   goalId,
@@ -1085,6 +1103,8 @@ export default function CoachingScreen({
             reminderStatus={reminderStatus}
             onOpen={() => setShowReminderSettingsPage(true)}
           />
+
+          <AccountLink />
         </Card>
       </Shell>
     );

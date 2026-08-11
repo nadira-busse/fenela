@@ -2,6 +2,7 @@ import { requireUser } from "@/server/auth/requireUser";
 import { safeRedirectPath } from "@/lib/auth/safeRedirect";
 import { AuthPanel } from "./AuthPanel";
 import { SignOutButton } from "./SignOutButton";
+import { DeleteAccountButton } from "./DeleteAccountButton";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default async function AuthPage({
             Signed in{user.email ? ` as ${user.email}` : ""}.
           </p>
           <SignOutButton />
+          <DeleteAccountButton />
         </div>
       ) : (
         <AuthPanel next={next} />
