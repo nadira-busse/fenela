@@ -105,10 +105,6 @@ async function ensurePushAndSubscribe(
       };
     }
 
-    // For an authenticated caller, the server may return a different,
-    // ownership-verified device id than the one just sent (Phase 4D
-    // §9/§10) — scheduling below must use that one, and the local cache
-    // must be updated so later Coaching reminder settings use it too.
     const effectiveDeviceId =
       typeof data?.deviceId === "string" && data.deviceId.length > 0 ? data.deviceId : deviceId;
 
@@ -224,17 +220,8 @@ export default function ScreeningScreen({ onDone }: Props) {
         return;
       }
 
-      // The DB write is the canonical persistence step above; this keeps
-      // the existing local compatibility cache in sync so IntakeScreen/
-      // CoachingScreen (which still read via loadScreening()) see the same
-      // values without needing a broader refactor in this phase.
       saveCurrentScreening();
 
-      // ReminderPreference is now the single canonical source for
-      // enabled/start_time (Phase 4D, ADR-004) — saved here regardless of
-      // the choice, including "Not now" (enabled: false), so onboarding
-      // and Coaching's later Reminder Settings always read/write the same
-      // row instead of two independent local values.
       const reminderPrefResult = await saveReminderPreferenceAction({
         enabled: dailyReminder === "YES",
         startTime,
@@ -303,197 +290,181 @@ export default function ScreeningScreen({ onDone }: Props) {
 
   return (
     <div className="min-h-[100dvh] w-full bg-[var(--bg-app)] text-[var(--text-main)]">
-      <div className="mx-auto w-full max-w-[420px] px-4 pt-8 pb-10">
-        <h1 className="text-xl font-semibold">Let’s set up Fenéla.</h1>
+      <div className="mx-auto w-full max-w-[420px] px-5 py-10">
+        <div className="rounded-[32px] border border-black/5 bg-[var(--card-bg)] px-6 py-7 shadow-[0_15px_40px_rgba(0,0,0,0.04)]">
+          <h1 className="text-2xl font-bold">Let’s set up Fenéla.</h1>
 
-        <p className="mt-2 text-sm opacity-80">
-          These choices help Fenéla stay small, calm and useful.
-        </p>
-        <p className="mt-2 text-sm opacity-80">
-          Fenéla helps you turn one goal into small, concrete steps (&quot;anchors&quot;) and
-          focuses on one at a time.
-        </p>
+          <p className="mt-4 text-sm leading-relaxed text-[var(--text-soft)]">
+            A few quick choices help Fenéla support you in a way that fits.
+          </p>
 
-        {persistError ? (
-          <div
-            role="alert"
-            className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm"
-          >
-            <div className="font-semibold">Could not save your preferences</div>
-            <div className="mt-1 opacity-90">{persistError.message}</div>
-            {persistError.canRetryAuth ? (
-              <a href="/auth?next=%2F" className="mt-2 inline-block text-sm underline">
-                Sign in again
-              </a>
-            ) : null}
-          </div>
-        ) : null}
-
-        {warning ? (
-          <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">
-            <div className="font-semibold">Reminder skipped</div>
-            <div className="mt-1 opacity-90">{warning}</div>
-            <div className="mt-2 text-xs opacity-70">
-              You can still use Fenéla without browser notifications.
+          {persistError ? (
+            <div
+              role="alert"
+              className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm"
+            >
+              <div className="font-semibold">Could not save your preferences</div>
+              <div className="mt-1 opacity-90">{persistError.message}</div>
+              {persistError.canRetryAuth ? (
+                <a href="/auth?next=%2F" className="mt-2 inline-block text-sm underline">
+                  Sign in again
+                </a>
+              ) : null}
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <Section title="1) What should Fenéla call you?">
-          <label htmlFor="screening-name" className="sr-only">
-            Your first name
-          </label>
-          <input
-            id="screening-name"
-            name="screening-name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Your first name"
-            autoComplete="given-name"
-            className="mt-2 w-full rounded-xl border border-black/10 bg-white/5 px-3 py-2"
-          />
-          <Hint>This is saved to your account so Fenéla remembers it next time.</Hint>
-        </Section>
-
-        <Section title="2) Would you like help choosing anchors?">
-          <Radio
-            name="anchorChoiceHelp"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "I_DECIDE", label: "I’ll choose my own" },
-              { value: "SUGGEST_ANCHORS", label: "Suggest anchors" },
-            ]}
-          />
-        </Section>
-
-        <Section title="3) Do you want daily reminders?">
-          <Radio
-            name="dailyReminder"
-            value={dailyReminder}
-            onChange={(value) => {
-              setDailyReminder(value);
-              setWarning("");
-              setCanContinueWithoutReminders(false);
-            }}
-            options={[
-              { value: "YES", label: "Yes — gently remind me" },
-              { value: "NOT_NOW", label: "Not now" },
-            ]}
-          />
-
-          {dailyReminder === "YES" ? (
-            <div className="mt-3">
-              <label htmlFor="daily-start-time" className="text-sm font-medium">
-                Daily start time
-              </label>
-
-              <input
-                id="daily-start-time"
-                name="daily-start-time"
-                type="time"
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white/5 px-3 py-2"
-              />
-
-              <Hint>
-                On iPhone, reminders may require adding Fenéla to your Home Screen and opening it
-                from there.
-              </Hint>
+          {warning ? (
+            <div className="mt-5 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm">
+              <div className="font-semibold">Reminder skipped</div>
+              <div className="mt-1 opacity-90">{warning}</div>
             </div>
-          ) : (
-            <Hint>You can enable reminders later. Fenéla still works without them.</Hint>
-          )}
-        </Section>
+          ) : null}
 
-        <Section title="4) When today feels hard, what usually happens?">
-          <Radio
-            name="resistancePattern"
-            value={resistancePattern}
-            onChange={setResistancePattern}
-            options={[
-              { value: "DELAY", label: "I delay starting" },
-              { value: "FORCE", label: "I push myself too hard" },
-              { value: "QUIT", label: "I lose momentum" },
-              { value: "SWITCH", label: "I jump between things" },
-            ]}
-          />
-          <Hint>This helps Fenéla keep your next action realistic.</Hint>
-        </Section>
+          <Section title="1) What should Fenéla call you?">
+            <label htmlFor="screening-name" className="sr-only">
+              Your first name
+            </label>
+            <input
+              id="screening-name"
+              name="screening-name"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Your first name"
+              autoComplete="given-name"
+              className="mt-3 w-full rounded-2xl border border-[var(--text-main)]/15 bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--cta-primary)]"
+            />
+          </Section>
 
-        <Section title="5) What are you struggling with most right now?">
-          <Radio
-            name="mainChallenge"
-            value={mainChallenge}
-            onChange={setMainChallenge}
-            options={[
-              { value: "START", label: "Starting things" },
-              { value: "SUSTAIN", label: "Keeping going once I start" },
-              { value: "BOUNDARIES", label: "Protecting boundaries / not overdoing it" },
-            ]}
-          />
-        </Section>
+          <Section title="2) Would you like help choosing anchors?">
+            <Radio
+              name="anchorChoiceHelp"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "I_DECIDE", label: "I’ll choose my own" },
+                { value: "SUGGEST_ANCHORS", label: "Suggest anchors" },
+              ]}
+            />
+          </Section>
 
-        <Section title="6) I take action more easily when…">
-          <Radio
-            name="actionTrigger"
-            value={actionTrigger}
-            onChange={setActionTrigger}
-            options={[
-              { value: "SMALL", label: "It is very small and simple" },
-              { value: "WHY", label: "I understand why it helps" },
-              { value: "REMINDER", label: "I get reminded" },
-            ]}
-          />
-        </Section>
+          <Section title="3) Do you want daily reminders?">
+            <Radio
+              name="dailyReminder"
+              value={dailyReminder}
+              onChange={(value) => {
+                setDailyReminder(value);
+                setWarning("");
+                setCanContinueWithoutReminders(false);
+              }}
+              options={[
+                { value: "YES", label: "Yes — gently remind me" },
+                { value: "NOT_NOW", label: "Not now" },
+              ]}
+            />
 
-        <Section title="7) What should Fenéla avoid?">
-          <div className="mt-2 grid gap-2">
-            {antiHelpOptions.map((option) => {
-              const id = `anti-help-${option.key.toLowerCase().replaceAll("_", "-")}`;
-
-              return (
-                <label
-                  key={option.key}
-                  htmlFor={id}
-                  className="flex cursor-pointer items-center gap-2 rounded-xl border border-black/10 bg-white/5 px-3 py-2"
-                >
-                  <input
-                    id={id}
-                    name="antiHelp"
-                    type="checkbox"
-                    value={option.key}
-                    checked={antiHelp.includes(option.key)}
-                    onChange={() => toggleAntiHelp(option.key)}
-                  />
-                  <span>{option.label}</span>
+            {dailyReminder === "YES" ? (
+              <div className="mt-4">
+                <label htmlFor="daily-start-time" className="text-sm font-medium">
+                  Daily start time
                 </label>
-              );
-            })}
-          </div>
-          <Hint>This keeps Fenéla calmer and lower-pressure.</Hint>
-        </Section>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting || !canSubmit}
-          className="mt-6 w-full rounded-2xl bg-white/10 px-4 py-3 font-medium disabled:opacity-50"
-        >
-          {submitting ? "Setting up…" : "Start my day"}
-        </button>
+                <input
+                  id="daily-start-time"
+                  name="daily-start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => setStartTime(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-[var(--text-main)]/15 bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--cta-primary)]"
+                />
+              </div>
+            ) : null}
+          </Section>
 
-        {canContinueWithoutReminders ? (
+          <Section title="4) When today feels hard, what usually happens?">
+            <Radio
+              name="resistancePattern"
+              value={resistancePattern}
+              onChange={setResistancePattern}
+              options={[
+                { value: "DELAY", label: "I delay starting" },
+                { value: "FORCE", label: "I push myself too hard" },
+                { value: "QUIT", label: "I lose momentum" },
+              ]}
+            />
+          </Section>
+
+          <Section title="5) What are you struggling with most right now?">
+            <Radio
+              name="mainChallenge"
+              value={mainChallenge}
+              onChange={setMainChallenge}
+              options={[
+                { value: "START", label: "Starting things" },
+                { value: "SUSTAIN", label: "Keeping going once I start" },
+                { value: "BOUNDARIES", label: "Protecting boundaries / not overdoing it" },
+              ]}
+            />
+          </Section>
+
+          <Section title="6) I take action more easily when…">
+            <Radio
+              name="actionTrigger"
+              value={actionTrigger}
+              onChange={setActionTrigger}
+              options={[
+                { value: "SMALL", label: "It is very small and simple" },
+                { value: "WHY", label: "I understand why it helps" },
+                { value: "REMINDER", label: "I get reminded" },
+              ]}
+            />
+          </Section>
+
+          <Section title="7) What should Fenéla avoid?">
+            <div className="mt-3 grid gap-2">
+              {antiHelpOptions.map((option) => {
+                const id = `anti-help-${option.key.toLowerCase().replaceAll("_", "-")}`;
+
+                return (
+                  <label
+                    key={option.key}
+                    htmlFor={id}
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[var(--text-main)]/10 px-4 py-3 text-sm"
+                  >
+                    <input
+                      id={id}
+                      name="antiHelp"
+                      type="checkbox"
+                      value={option.key}
+                      checked={antiHelp.includes(option.key)}
+                      onChange={() => toggleAntiHelp(option.key)}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </Section>
+
           <button
             type="button"
-            onClick={handleContinueWithoutReminders}
-            className="mt-3 w-full rounded-2xl border border-white/15 px-4 py-3 font-medium"
+            onClick={handleSubmit}
+            disabled={submitting || !canSubmit}
+            className="mt-8 w-full rounded-2xl bg-[var(--cta-primary)] px-4 py-4 text-base font-bold text-[var(--cta-primary-text)] transition-transform active:scale-95 disabled:opacity-50"
           >
-            Continue without reminders
+            {submitting ? "Setting up…" : "Start my day"}
           </button>
-        ) : null}
+
+          {canContinueWithoutReminders ? (
+            <button
+              type="button"
+              onClick={handleContinueWithoutReminders}
+              className="mt-3 w-full rounded-2xl border border-[var(--text-main)]/15 px-4 py-4 font-medium"
+            >
+              Continue without reminders
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -501,15 +472,11 @@ export default function ScreeningScreen({ onDone }: Props) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mt-6">
-      <h2 className="text-base font-semibold">{title}</h2>
+    <section className="mt-7">
+      <h2 className="text-sm font-semibold leading-snug">{title}</h2>
       {children}
-    </div>
+    </section>
   );
-}
-
-function Hint({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-xs opacity-70">{children}</p>;
 }
 
 function Radio<T extends string>({
@@ -524,7 +491,7 @@ function Radio<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="mt-2 grid gap-2">
+    <div className="mt-3 grid gap-2">
       {options.map((option) => {
         const id = `${name}-${option.value.toLowerCase().replaceAll("_", "-")}`;
 
@@ -532,7 +499,7 @@ function Radio<T extends string>({
           <label
             key={option.value}
             htmlFor={id}
-            className="flex cursor-pointer items-center gap-2 rounded-xl border border-black/10 bg-white/5 px-3 py-2"
+            className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[var(--text-main)]/10 px-4 py-3 text-sm"
           >
             <input
               id={id}

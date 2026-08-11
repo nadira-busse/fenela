@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type MagicLinkStatus = "idle" | "sending" | "sent" | "error";
-type GoogleStatus = "idle" | "redirecting" | "error";
 
 type Props = {
   // Already validated server-side (safeRedirectPath) by src/app/auth/page.tsx
@@ -15,30 +14,11 @@ type Props = {
 export function AuthPanel({ next = "/" }: Props) {
   const [email, setEmail] = useState("");
   const [magicLinkStatus, setMagicLinkStatus] = useState<MagicLinkStatus>("idle");
-  const [googleStatus, setGoogleStatus] = useState<GoogleStatus>("idle");
 
   function callbackUrl() {
     const url = new URL("/auth/callback", window.location.origin);
     url.searchParams.set("next", next);
     return url.toString();
-  }
-
-  async function handleGoogleSignIn() {
-    setGoogleStatus("redirecting");
-
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl(),
-      },
-    });
-
-    if (error) {
-      setGoogleStatus("error");
-    }
-    // On success the browser navigates away to Google, so no further local
-    // state update is needed.
   }
 
   async function handleMagicLinkSubmit(event: FormEvent<HTMLFormElement>) {
@@ -63,25 +43,16 @@ export function AuthPanel({ next = "/" }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <button
-        type="button"
-        onClick={handleGoogleSignIn}
-        disabled={googleStatus === "redirecting"}
-        className="rounded-lg border border-[var(--text-main)]/20 px-4 py-3 text-sm font-medium text-[var(--text-main)] disabled:opacity-60"
-      >
-        {googleStatus === "redirecting" ? "Redirecting…" : "Continue with Google"}
-      </button>
-      {googleStatus === "error" ? (
-        <p role="alert" className="text-sm text-red-600">
-          Google sign-in could not be started. Please try again.
-        </p>
-      ) : null}
+    <div className="flex flex-col">
+      <p className="text-sm leading-relaxed text-[var(--text-soft)]">
+        Enter your email and we’ll send you a secure magic link.
+      </p>
 
-      <form onSubmit={handleMagicLinkSubmit} className="flex flex-col gap-3">
-        <label htmlFor="auth-email" className="text-sm font-medium text-[var(--text-main)]">
+      <form onSubmit={handleMagicLinkSubmit} className="mt-6 flex flex-col">
+        <label htmlFor="auth-email" className="sr-only">
           Email
         </label>
+
         <input
           id="auth-email"
           name="email"
@@ -91,22 +62,25 @@ export function AuthPanel({ next = "/" }: Props) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
-          className="rounded-lg border border-[var(--text-main)]/20 px-4 py-3 text-sm"
+          className="mt-2 rounded-2xl border border-[var(--text-main)]/15 bg-white px-4 py-4 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--cta-primary)]"
         />
+
         <button
           type="submit"
           disabled={magicLinkStatus === "sending"}
-          className="rounded-lg bg-[var(--text-main)] px-4 py-3 text-sm font-medium text-[var(--bg-app)] disabled:opacity-60"
+          className="mt-6 w-full rounded-2xl bg-[var(--cta-primary)] px-4 py-4 text-base font-bold text-[var(--cta-primary-text)] transition-transform active:scale-95 disabled:opacity-60"
         >
           {magicLinkStatus === "sending" ? "Sending…" : "Send magic link"}
         </button>
+
         {magicLinkStatus === "sent" ? (
-          <p role="status" className="text-sm text-[var(--text-main)]">
+          <p role="status" className="mt-4 text-sm leading-relaxed text-[var(--text-soft)]">
             Check your email for a sign-in link.
           </p>
         ) : null}
+
         {magicLinkStatus === "error" ? (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="mt-4 text-sm text-red-600">
             The sign-in link could not be sent. Please try again.
           </p>
         ) : null}

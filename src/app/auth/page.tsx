@@ -35,26 +35,33 @@ export default async function AuthPage({
   const user = await getCurrentUser();
 
   return (
-    <main className="flex min-h-[100dvh] flex-col justify-center gap-6 py-10">
-      <h1 className="text-xl font-semibold text-[var(--text-main)]">Sign in</h1>
+    <main className="min-h-[100dvh] w-full bg-[var(--bg-app)] text-[var(--text-main)]">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[420px] flex-col justify-center px-6 py-12">
+        <div className="rounded-[32px] border border-black/5 bg-[var(--card-bg)] p-8 shadow-[0_15px_40px_rgba(0,0,0,0.04)]">
+          <h1 className="text-2xl font-bold">Sign in to Fenéla</h1>
 
-      {error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {errorMessage(error)}
-        </p>
-      ) : null}
+          {error ? (
+            <p role="alert" className="mt-4 text-sm leading-relaxed text-red-600">
+              {errorMessage(error)}
+            </p>
+          ) : null}
 
-      {user ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-[var(--text-main)]">
-            Signed in{user.email ? ` as ${user.email}` : ""}.
-          </p>
-          <SignOutButton />
-          <DeleteAccountButton />
+          {user ? (
+            <div className="mt-6 flex flex-col gap-3">
+              <p className="text-sm leading-relaxed text-[var(--text-soft)]">
+                Signed in{user.email ? ` as ${user.email}` : ""}.
+              </p>
+
+              <SignOutButton />
+              <DeleteAccountButton />
+            </div>
+          ) : (
+            <div className="mt-5">
+              <AuthPanel next={next} />
+            </div>
+          )}
         </div>
-      ) : (
-        <AuthPanel next={next} />
-      )}
+      </div>
     </main>
   );
 }

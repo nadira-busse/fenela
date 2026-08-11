@@ -225,7 +225,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
 
@@ -331,7 +330,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
   }, [step, goalValid, struggleValid, goalWhyValid, anchorsValid, lastStep]);
 
   const updateAnchor = (id: string, text: string) => {
-    setFormError(null);
     setAnchors((prev) => prev.map((anchor) => (anchor.id === id ? { ...anchor, text } : anchor)));
   };
 
@@ -355,7 +353,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
 
     setAiLoading(true);
     setAiError(null);
-    setFormError(null);
 
     try {
       const storedScreening = screening ?? loadScreening();
@@ -446,8 +443,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
   }, [isAnchorsStep]);
 
   const handleNext = async () => {
-    setFormError(null);
-
     if (!canContinue) return;
 
     if (step >= lastStep) {
@@ -554,7 +549,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                   name="intake-goal"
                   value={goal}
                   onChange={(event) => {
-                    setFormError(null);
                     setGoal(event.target.value);
                   }}
                   onKeyDown={handleKeyDown}
@@ -581,7 +575,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                   name="intake-struggle"
                   value={struggle}
                   onChange={(event) => {
-                    setFormError(null);
                     setStruggle(event.target.value);
                   }}
                   onKeyDown={handleKeyDown}
@@ -608,7 +601,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                   name="intake-goal-why"
                   value={goalWhy}
                   onChange={(event) => {
-                    setFormError(null);
                     setGoalWhy(event.target.value);
                   }}
                   onKeyDown={handleKeyDown}
@@ -717,12 +709,6 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                 >
                   + Add another
                 </button>
-
-                {formError && (
-                  <div className="rounded-2xl border border-black/10 bg-white/50 px-4 py-3 text-sm text-black/70">
-                    {formError}
-                  </div>
-                )}
 
                 {persistError && (
                   <div

@@ -1081,8 +1081,7 @@ export default function CoachingScreen({
   if (state === "START_DAY") {
     return (
       <Shell>
-        <p className="text-sm text-black/40 mb-2">Hello, {intake.name}</p>
-        <h1 className="text-2xl font-bold mb-8">{ai.title ?? "Your anchor"}</h1>
+        <h1 className="text-2xl font-bold mb-8">Hello, {intake.name}</h1>
 
         <Card>
           <div className="space-y-5 mb-8">
@@ -1256,8 +1255,9 @@ export default function CoachingScreen({
     return (
       <Shell>
         <h1 className="text-2xl font-bold mb-1">{ai.doneTitle ?? "End of day"}</h1>
+
         <p className="text-sm text-black/40 mb-8 whitespace-pre-line">
-          {ai.doneLine ?? "Continue tomorrow."}
+          {ai.doneLine ?? "You showed up today. Come back tomorrow."}
         </p>
 
         <Card>
@@ -1283,14 +1283,11 @@ export default function CoachingScreen({
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs text-[var(--text-soft)] text-center">
-              Reset today keeps your anchors and starts this day again.
-            </p>
-
             <div className="grid grid-cols-2 gap-4">
               <ActionBtn onClick={onRestartDay} variant="ghost">
                 Reset today
               </ActionBtn>
+
               <ActionBtn onClick={onResetEverything} variant="ghost" disabled={newGoalPending}>
                 {newGoalPending ? "Starting…" : "New goal"}
               </ActionBtn>
