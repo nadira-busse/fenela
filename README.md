@@ -2,6 +2,12 @@
 
 [![CI](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml/badge.svg)](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml)
 
+## Live application
+
+[Open Fenéla](https://fenela.vercel.app)
+
+---
+
 Fenéla is a calm accountability app for moments when a goal feels too large to start.
 
 It helps the user turn one goal into small, concrete actions and focus on one step at a time.
