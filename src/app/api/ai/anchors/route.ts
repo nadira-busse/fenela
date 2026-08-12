@@ -17,10 +17,11 @@ import {
 } from "@/lib/aiAnchors";
 import { validateSafeAnchorList, validateSafeUserText } from "@/lib/safety";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
 
 export const runtime = "nodejs";
 
-type ErrorCode = "BAD_REQUEST" | "UNSAFE_INPUT" | "AI_GENERATION_FAILED";
+type ErrorCode = "BAD_REQUEST" | "UNSAFE_INPUT" | "UNAUTHENTICATED" | "AI_GENERATION_FAILED";
 
 function jsonError(message: string, code: ErrorCode, status: number) {
   return NextResponse.json({ error: message, code }, { status });
@@ -200,6 +201,22 @@ export async function POST(req: NextRequest) {
 
   if (!body) {
     return jsonError("Invalid anchor request.", "BAD_REQUEST", 400);
+  }
+
+  // Anchor generation is an authenticated product feature — it costs real
+  // OpenAI spend and must not be reachable by an anonymous caller.
+  // UnauthenticatedError is the genuine "no session" case; anything else
+  // (a verification/infrastructure failure) must not be treated the same
+  // as anonymous, so it fails closed instead of falling through to
+  // generation.
+  try {
+    await requireUser();
+  } catch (error) {
+    if (error instanceof UnauthenticatedError) {
+      return jsonError("Your session expired. Please sign in again.", "UNAUTHENTICATED", 401);
+    }
+
+    return jsonError("Could not verify authentication. Please try again.", "UNAUTHENTICATED", 500);
   }
 
   const inputValidation = validateUserInput(body);

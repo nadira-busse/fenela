@@ -8,8 +8,11 @@ vi.mock("@/lib/rateLimit", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
 }));
 
-const { getOptionalUser } = vi.hoisted(() => ({ getOptionalUser: vi.fn() }));
-vi.mock("@/server/auth/requireUser", () => ({ getOptionalUser }));
+const { requireUser, UnauthenticatedError } = vi.hoisted(() => {
+  class UnauthenticatedError extends Error {}
+  return { requireUser: vi.fn(), UnauthenticatedError };
+});
+vi.mock("@/server/auth/requireUser", () => ({ requireUser, UnauthenticatedError }));
 
 const { savePushSubscriptionForOwnDevice } = vi.hoisted(() => ({
   savePushSubscriptionForOwnDevice: vi.fn(),
@@ -43,8 +46,10 @@ describe("POST /api/push/subscribe", () => {
   let kvSadd: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    getOptionalUser.mockReset();
+    requireUser.mockReset();
     savePushSubscriptionForOwnDevice.mockReset();
+
+    requireUser.mockResolvedValue({ id: "user-a" });
 
     kvSet = vi.fn().mockResolvedValue(undefined);
     kvSadd = vi.fn().mockResolvedValue(undefined);
@@ -52,7 +57,6 @@ describe("POST /api/push/subscribe", () => {
   });
 
   it("authenticated success: writes KV only after DB ownership succeeds, and returns the verified device id", async () => {
-    getOptionalUser.mockResolvedValue({ id: "user-a" });
     savePushSubscriptionForOwnDevice.mockResolvedValue({
       ok: true,
       deviceId: "verified-device-id",
@@ -67,7 +71,6 @@ describe("POST /api/push/subscribe", () => {
   });
 
   it("authenticated DB failure: fails closed, never writes KV, never falls back to the raw client device id", async () => {
-    getOptionalUser.mockResolvedValue({ id: "user-a" });
     savePushSubscriptionForOwnDevice.mockResolvedValue({
       ok: false,
       message: "Could not save your push subscription right now.",
@@ -83,9 +86,22 @@ describe("POST /api/push/subscribe", () => {
     expect(kvSadd).not.toHaveBeenCalled();
   });
 
-  it("authenticated auth-infrastructure failure: fails closed and never falls back to the anonymous KV path", async () => {
+  it("unauthenticated: rejected with 401, never reaches DB or KV writes", async () => {
+    requireUser.mockRejectedValue(new UnauthenticatedError("no session"));
+
+    const response = await POST(makeRequest(validBody()) as unknown as Request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.ok).toBe(false);
+    expect(savePushSubscriptionForOwnDevice).not.toHaveBeenCalled();
+    expect(kvSet).not.toHaveBeenCalled();
+    expect(kvSadd).not.toHaveBeenCalled();
+  });
+
+  it("auth verification/infrastructure failure: fails closed, distinct from a genuine unauthenticated request", async () => {
     class AuthVerificationError extends Error {}
-    getOptionalUser.mockRejectedValue(new AuthVerificationError("Auth service unavailable"));
+    requireUser.mockRejectedValue(new AuthVerificationError("Auth service unavailable"));
 
     const response = await POST(makeRequest(validBody()) as unknown as Request);
     const data = await response.json();
@@ -94,19 +110,5 @@ describe("POST /api/push/subscribe", () => {
     expect(savePushSubscriptionForOwnDevice).not.toHaveBeenCalled();
     expect(kvSet).not.toHaveBeenCalled();
     expect(kvSadd).not.toHaveBeenCalled();
-  });
-
-  it("genuine anonymous request: existing KV-only legacy path still works, using the raw client device id", async () => {
-    getOptionalUser.mockResolvedValue(null);
-
-    const response = await POST(
-      makeRequest(validBody("raw-client-device-id")) as unknown as Request
-    );
-    const data = await response.json();
-
-    expect(data).toEqual({ ok: true, deviceId: "raw-client-device-id" });
-    expect(savePushSubscriptionForOwnDevice).not.toHaveBeenCalled();
-    expect(kvSet).toHaveBeenCalledWith("push:sub:raw-client-device-id", expect.any(Object));
-    expect(kvSadd).toHaveBeenCalledWith("push:devices:set", "raw-client-device-id");
   });
 });

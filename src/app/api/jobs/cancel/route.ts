@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { removeJobForDevice } from "@/lib/jobs";
-import { getOptionalUser } from "@/server/auth/requireUser";
+import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
 import { verifyOwnDevice } from "@/server/devices/verifyOwnDevice";
 
 export const runtime = "nodejs";
@@ -28,20 +28,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing deviceId" }, { status: 400 });
     }
 
-    // Caller-supplied deviceId is not authorization proof (Phase 4D §9):
-    // an authenticated request must operate only on a Device it owns.
-    // Unauthenticated/legacy requests are unaffected.
-    const user = await getOptionalUser();
-
-    if (user) {
-      const ownsDevice = await verifyOwnDevice(deviceId);
-
-      if (!ownsDevice) {
+    try {
+      await requireUser();
+    } catch (error) {
+      if (error instanceof UnauthenticatedError) {
         return NextResponse.json(
-          { ok: false, error: "This device is not linked to your account." },
-          { status: 403 }
+          { ok: false, error: "Your session expired. Please sign in again." },
+          { status: 401 }
         );
       }
+
+      throw error;
+    }
+
+    // Caller-supplied deviceId is not authorization proof: a request must
+    // operate only on a Device the authenticated caller owns.
+    const ownsDevice = await verifyOwnDevice(deviceId);
+
+    if (!ownsDevice) {
+      return NextResponse.json(
+        { ok: false, error: "This device is not linked to your account." },
+        { status: 403 }
+      );
     }
 
     if (!jobId) {

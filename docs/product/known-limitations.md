@@ -1,12 +1,10 @@
 # Known Limitations
 
-This document describes the current boundaries of the Fenéla MVP2 repository state.
-
-Some are deliberate product choices. Others follow from browser, device, deployment and infrastructure constraints. The production deployment has not yet been updated to the final MVP2 repository state.
+This document describes the current product and technical limitations of Fenéla.
 
 ## Account and device state
 
-MVP2 uses Supabase Auth and authenticated, user-owned PostgreSQL persistence for canonical preferences, Goals, Anchors, reminder preferences and factual event history.
+Fenéla uses Supabase Auth and authenticated, user-owned PostgreSQL persistence for canonical preferences, Goals, Anchors, reminder preferences and factual event history.
 
 Some compatibility/day-state UI data remains browser-local. Push subscriptions remain device-specific and belong to an authenticated Device row; a device identifier is not an authorization credential.
 
@@ -36,7 +34,7 @@ On iPhone and iPad, Web Push should be tested through a Home Screen installation
 
 For authenticated users, reminder `enabled` state and daily `start_time` are canonical account-owned `ReminderPreference` data in PostgreSQL. Push delivery remains device-specific.
 
-The current MVP2 scope does not add sophisticated multi-device reminder fanout.
+Fenéla does not add sophisticated multi-device reminder fanout.
 
 ## Private browsing
 
@@ -65,7 +63,7 @@ Some legacy/local compatibility behavior may still use browser-local state, but 
 
 ## Authentication and route protection
 
-MVP2 uses Supabase Auth for user-owned persistence and derives authenticated identity server-side. RLS and ownership checks protect account-owned data; device identifiers are not treated as authorization credentials.
+Fenéla uses Supabase Auth for user-owned persistence and derives authenticated identity server-side. RLS and ownership checks protect account-owned data; device identifiers are not treated as authorization credentials.
 
 Validation, rate limiting and other abuse controls remain separate from authentication where they serve a different purpose. They reduce repeated use, cost exposure or storage growth but are not substitutes for identity and authorization.
 
@@ -78,7 +76,7 @@ Users can permanently delete their account at any time from `/auth`. Accounts in
 Two accepted limitations of the current implementation:
 
 - No advance warning email is sent before 12-month inactivity deletion. Fenéla has no email-sending infrastructure today, and this is a deliberate scope decision rather than a technical gap being tracked.
-- The retention job scans Auth users in a single bounded, sequential run rather than a queueing platform built for unlimited scale. This is an accepted MVP2 engineering trade-off, not a currently binding real-world constraint.
+- The retention job scans Auth users in a single bounded, sequential run rather than a queueing platform built for unlimited scale. This is an accepted engineering trade-off for Fenéla's current scale.
 
 ## AI and safety limits
 

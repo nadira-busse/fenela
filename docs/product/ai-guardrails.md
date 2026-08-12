@@ -77,7 +77,7 @@ secret weapon
 
 Several checks therefore require a person, malicious object or other harmful context before blocking the input.
 
-This reduces avoidable false positives, but indirect or unusual unsafe phrasing may still be missed. The filter is a basic MVP 1 guardrail, not comprehensive intent detection.
+This reduces avoidable false positives, but indirect or unusual unsafe phrasing may still be missed. The filter is deliberately narrow and does not provide comprehensive intent detection.
 
 ## Generation and output validation
 
@@ -126,4 +126,4 @@ The current guardrails do not provide comprehensive content moderation, crisis a
 
 The pattern filter can produce false positives and false negatives. Prompt instructions and model output can also fail.
 
-These limits are accepted for MVP 1 and are documented rather than hidden.
+These limits are documented explicitly rather than hidden.

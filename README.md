@@ -2,190 +2,285 @@
 
 [![CI](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml/badge.svg)](https://github.com/nadira-busse/Fenela/actions/workflows/ci.yml)
 
-Fenéla is a calm accountability app for moments when a goal feels too large to start. It helps the user turn that goal into manageable actions and focus on one step at a time.
+Fenéla is a calm accountability app for moments when a goal feels too large to start.
 
-The app is built around one focused loop:
+It helps the user turn one goal into small, concrete actions and focus on one step at a time.
+
+The product is built around one focused loop:
 
 ```text
 overwhelm → one goal → small anchors → one step at a time → gentle accountability → daily return
 ```
 
-When someone already feels overwhelmed, a larger planning system can add more decisions and more pressure. Fenéla takes a different approach.
+When someone already feels overwhelmed, a larger planning system can add more decisions and more pressure. Fenéla takes a smaller approach.
 
-The user starts with one goal and explains what is making it difficult. Fenéla can then use optional AI assistance to turn that goal into small, concrete anchors.
+The user chooses one goal, explains what is making it difficult and decides whether they want help choosing small actions. Fenéla can suggest anchors with AI, or the user can create their own.
 
-During the day, Fenéla presents one anchor at a time. This limits the immediate decision while still allowing the user to work toward a larger goal.
+During the day, Fenéla presents one anchor at a time.
+
+This repository represents the completed MVP2 release of Fenéla.
 
 ## Why I built this
 
 I built Fenéla around a practical problem: when someone feels overwhelmed, even a simple action can be difficult to start.
 
-Most productivity tools assume that the user is ready to plan, prioritise and make several decisions. Fenéla is designed for moments when that is already too much. It reduces the immediate task by presenting one small, concrete action at a time.
+Most productivity tools assume the user is ready to plan, prioritise and make several decisions. Fenéla is designed for the moment before that.
 
-Sometimes the difficulty is not only taking the first step, but identifying what that step should be. Optional AI assistance supports this part of the flow. The user describes one goal, the current friction and why the goal matters. The goal gives Fenéla a direction. The current friction helps it suggest a smaller and more realistic starting point, while the reason behind the goal helps keep the suggestions connected to what matters to the user. Fenéla then generates three small, concrete anchors.
+Instead of creating a larger plan, it reduces the immediate decision to one small action.
 
-The user can use those anchors as they are, regenerate them, edit them or add their own until the set contains up to five anchors.
+AI has a deliberately limited role. It can suggest small anchors based on the user's goal and context, but it does not decide what the user should do. Suggestions can be accepted, edited, regenerated or replaced.
 
-The AI provides suggestions, not decisions. The user remains in control of the goal, the selected anchors and what happens next.
-
-Fenéla has a practical and limited role: help the user take a realistic first step, repeat those actions over time and gradually build a routine they can continue independently.
+The user remains in control.
 
 ## Screenshots
 
-The screenshots below show the main product flow: setup, goal intake, anchor selection and the accountability screen.
+The screenshots below show the current product flow from personalization to one small daily action.
 
-### Setup and personalization
+### Personalization
 
-<p>
-  <img src="assets/screenshots/01-setup-preferences.png" alt="Fenéla setup preferences" width="46%">
-  <img src="assets/screenshots/02-personalization-choices.png" alt="Fenéla personalization choices" width="46%">
-</p>
+![Fenéla personalization choices](assets/screenshots/01-personalization-choices.png)
+
+### Goal and anchors
 
 | Goal intake                                                   | AI-assisted anchor suggestions                                                            |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ![Fenéla goal intake](assets/screenshots/03-focus-intake.png) | ![Fenéla AI-assisted anchor suggestions](assets/screenshots/04-ai-anchor-suggestions.png) |
+| ![Fenéla goal intake](assets/screenshots/02-focus-intake.png) | ![Fenéla AI-assisted anchor suggestions](assets/screenshots/03-ai-anchor-suggestions.png) |
 
-| Accountability screen                                                      |
-| -------------------------------------------------------------------------- |
-| ![Fenéla accountability screen](assets/screenshots/05-coaching-screen.png) |
+### Daily accountability
 
-## Demo
-
-A short demo video is available here:
-
-[Watch the Fenéla demo](https://youtu.be/zX39vEO2K78)
-
-## Project status
-
-Fenéla is a working application that I use myself.
-
-MVP1 established the core product loop. MVP2 is now actively implemented in the repository and adds authenticated, user-owned persistence, canonical reminder/device ownership, factual event history, deterministic reflection persistence, and account deletion with 12-month inactivity retention.
-
-The public production deployment has not yet been updated to this MVP2 repository state. Repository documentation therefore distinguishes between implemented and validated development work and functionality that is already available in the deployed application.
-
-I continue to improve Fenéla when there is a clear product, engineering or maintenance reason to do so, rather than adding features simply to make the project larger.
+![Fenéla today's small step](assets/screenshots/04-todays-small-step.png)
 
 ## What Fenéla does
 
-Fenéla helps a user:
+Fenéla allows a user to:
 
-- choose one personal goal;
+- sign in with a passwordless email Magic Link;
+- set a small number of personal preferences;
+- choose one goal;
 - describe what is making that goal difficult and why it matters;
-- use optional AI assistance to turn the goal into three small anchors;
-- use, regenerate, edit or remove the suggested anchors, and add their own until the set contains up to five anchors;
+- create their own anchors or use optional AI assistance;
+- receive three small AI-assisted anchor suggestions;
+- edit, regenerate, remove or replace those suggestions;
+- keep up to five anchors for a goal;
 - focus on one anchor at a time;
-- mark an anchor as done or postpone it;
-- automatically park an anchor for the day after it has been postponed three times;
-- enable, disable or adjust optional reminders;
-- continue without reminders if they prefer;
-- return to the same anchors on another day without rebuilding the plan.
+- mark an anchor as completed;
+- postpone an anchor when it is not the right moment;
+- record friction when a step feels difficult;
+- automatically park an anchor for the day after repeated postponement;
+- enable, disable and change optional daily reminders;
+- reset the current day without rebuilding the goal;
+- start a new goal when the current one is no longer relevant;
+- return to the same goal and anchors across sessions;
+- receive a deterministic weekly reflection based on factual activity history;
+- delete their account and associated user-owned data.
 
-The app is designed for low-friction use. If a feature adds pressure or cognitive load without supporting the core loop, it does not belong in the MVP.
+Fenéla is deliberately small. Features that add cognitive load without strengthening the core accountability loop are kept out of the current product.
 
-### Reusing saved anchors
+## Weekly reflection
 
-Fenéla keeps the user's saved anchors available across days.
+Fenéla keeps factual history about completed, postponed and difficult actions.
 
-This supports two different ways of using the app. Someone who is rebuilding or establishing a routine can repeat the same familiar actions over time instead of creating a new plan every morning. A user working toward a specific daily goal can change the plan whenever that goal changes.
+That history supports a deterministic weekly reflection. The reflection is based on recorded events rather than generated interpretation.
 
-The user can reset the current day while keeping the existing anchors, or start again with a different goal.
+AI is not used to create the reflection facts.
+
+The repository also contains technical support for monthly reflection periods, but a monthly user-facing reflection is not part of the current product.
+
+## Authentication and user-owned data
+
+Fenéla uses Supabase authentication and PostgreSQL-backed persistence.
+
+Users sign in through a passwordless email Magic Link.
+
+Authenticated application data is owned by the signed-in user. Row Level Security and server-side ownership checks are used to keep user-owned records separated.
+
+Canonical persisted data includes:
+
+- user preferences;
+- reminder preferences;
+- goals;
+- anchors;
+- action events;
+- friction events;
+- reflections;
+- devices;
+- push subscriptions;
+- product activity used for retention.
+
+Authenticated user data is persisted in PostgreSQL. Browser storage is used only for limited local UI state.
+
+## Reminders
+
+Daily reminders are optional.
+
+Fenéla separates reminder preferences from device-specific push subscriptions:
+
+- the user's reminder preference stores whether reminders are enabled and the chosen start time;
+- device records establish ownership;
+- push subscriptions belong to verified devices;
+- operational reminder jobs are stored separately from canonical user-owned product data.
+
+If notifications are unavailable or permission is declined, Fenéla continues to work without them.
+
+## Privacy and data lifecycle
+
+Fenéla follows a deliberately limited data model.
+
+The application stores data needed for the product flow, user-owned persistence, reminders, factual history and reflection.
+
+Account deletion removes the user's Fenéla account and associated user-owned data through the same canonical deletion path used by inactivity retention.
+
+Fenéla applies a **12-month inactivity retention policy** based on authenticated product activity.
+
+See [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md) for the detailed data-purpose and lifecycle model.
 
 ## Product boundary
 
-Fenéla is an accountability app, not a therapy, medical or full productivity tool. It does not replace professional support.
+Fenéla is an accountability application.
+
+It is not:
+
+- a therapy application;
+- a medical tool;
+- a full productivity system;
+- an AI planner;
+- an autonomous coach.
+
+AI assistance is optional and bounded to anchor suggestions.
 
 ## Technical overview
 
-Fenéla is built with Next.js, React and TypeScript.
+Fenéla is built with:
+
+- Next.js;
+- React;
+- TypeScript;
+- Supabase Auth;
+- PostgreSQL;
+- Row Level Security;
+- Vitest;
+- Web Push;
+- KV-backed operational reminder storage;
+- OpenAI for optional anchor suggestions.
 
 The application separates:
 
-- React components for the user flow;
-- storage helpers for screening, anchors and day state;
-- a narrow AI route with separate parsing, validation, repair and fallback logic;
-- push and reminder routes for subscriptions, scheduled jobs and delivery.
+- React components for the product flow;
+- authenticated server operations for user-owned persistence;
+- deterministic mapping and aggregation logic;
+- AI parsing, validation, repair and fallback behavior;
+- reminder preferences and device ownership;
+- operational push scheduling;
+- factual action and friction events;
+- deterministic reflection generation;
+- account deletion and inactivity retention.
 
-Vitest covers core application and API behavior. GitHub Actions runs formatting, linting, tests and the production build.
+See the [architecture overview](architecture/architecture-overview.md) for the full system structure.
 
-See the [architecture overview](architecture/architecture-overview.md) for the complete structure.
+## AI boundary
+
+AI is used for one narrow product function: suggesting anchors.
+
+The AI receives bounded input and returns structured suggestions. The server validates the response before it reaches the product flow.
+
+The implementation includes:
+
+- schema-constrained output;
+- parsing and validation;
+- bounded repair behavior;
+- deterministic fallback anchors when AI generation fails;
+- safety checks;
+- server-side rate limiting.
+
+The AI provides suggestions, not decisions.
+
+See [AI and ethical-use guardrails](docs/product/ai-guardrails.md) for the detailed boundary.
 
 ## Engineering quality
 
 The repository includes:
 
-- Prettier and ESLint checks;
+- Prettier formatting checks;
+- ESLint;
+- TypeScript validation;
 - Vitest unit and API-route tests;
 - production build validation;
 - internal Markdown link checking;
-- GitHub Actions for pushes and pull requests;
-- rate limiting on public cost- and storage-sensitive routes.
+- GitHub Actions CI;
+- rate limiting for cost- and storage-sensitive routes;
+- authenticated ownership checks;
+- Row Level Security;
+- deterministic retention logic;
+- controlled failure behavior for account deletion, reminders and reflections.
 
-The tests cover AI parsing and fallback behavior, safety validation, route boundaries, reminder payloads and rate limiting.
+The current automated test suite contains **479 passing tests across 67 test files**.
 
-The CI workflow in `.github/workflows/ci.yml` runs formatting, linting, tests and production build checks on pushes and pull requests.
+GitHub Actions runs formatting, linting, tests and the production build on pushes and pull requests.
 
-Fenéla also includes server-side rate limiting on public AI and reminder routes to reduce cost and storage abuse.
+Validation has been run locally on Windows PowerShell and Linux through WSL.
 
-Recent validation runs on Windows PowerShell and Linux through WSL are included as runtime evidence:
+## Architecture decisions
 
-| Windows PowerShell                                                                                         | Linux through WSL                                                                 |
-| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ![Fenéla quality checks on Windows PowerShell](assets/screenshots/06-windows-powershell-quality-check.png) | ![Fenéla quality checks through WSL](assets/screenshots/07-wsl-quality-check.png) |
+Important product and engineering choices are documented as ADRs:
 
-## Quick start
+- [ADR-001 — AI-assisted anchors](decisions/ADR-001-ai-assisted-anchors.md)
+- [ADR-002 — Optional reminders](decisions/ADR-002-optional-reminders.md)
+- [ADR-003 — Authenticated user-owned persistence](decisions/ADR-003-authenticated-user-owned-persistence.md)
+- [ADR-004 — Reminder preferences and device ownership](decisions/ADR-004-reminder-preferences-and-device-ownership.md)
+- [ADR-005 — Deterministic reflection history](decisions/ADR-005-deterministic-reflection-history.md)
+
+## Run locally
+
+Fenéla requires a local or hosted Supabase project for authentication and persistence.
+
+Start with:
 
 ```bash
-npm install
-cp .env.example .env.local
-npm run dev
+npm ci
 ```
 
----
-
+Then follow [Local setup](docs/technical/local-setup.md) to start Supabase, apply the database migrations and configure .env.local before running the application.
 Open the local URL shown in the terminal.
 
-The application requires environment variables for optional AI, Web Push, storage and cron protection. See [Local setup](docs/technical/local-setup.md) for configuration, validation and troubleshooting.
+Fenéla requires configuration for authentication and canonical persistence. AI-assisted anchors, Web Push and operational reminder storage require their corresponding environment variables.
+
+See [Local setup](docs/technical/local-setup.md) for the complete setup and validation process.
 
 ## Environment variables
 
-| Variable                               | Purpose                                                         |
-| -------------------------------------- | --------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | MVP2 authentication foundation (Supabase Auth session handling) |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | MVP2 authentication foundation (Supabase Auth session handling) |
-| `OPENAI_API_KEY`                       | Enables optional AI-assisted anchor generation                  |
-| `OPENAI_MODEL`                         | Defines the OpenAI model used by the app                        |
-| `WEB_PUSH_PUBLIC_KEY`                  | Public VAPID key for browser push subscriptions                 |
-| `WEB_PUSH_PRIVATE_KEY`                 | Private VAPID key for sending push notifications                |
-| `WEB_PUSH_SUBJECT`                     | Contact subject used for VAPID configuration                    |
-| `STORAGE_KV_REST_API_URL`              | Storage endpoint for reminder and job data                      |
-| `STORAGE_KV_REST_API_TOKEN`            | Token for KV-compatible storage access                          |
-| `CRON_SECRET`                          | Shared secret used to protect the cron-triggered endpoint       |
+| Variable                               | Purpose                                              |
+| -------------------------------------- | ---------------------------------------------------- |
+| `SUPABASE_SECRET_KEY`                  | Server-side privileged Supabase operations           |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL                                 |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase browser authentication key                  |
+| `OPENAI_API_KEY`                       | Enables optional AI-assisted anchor generation       |
+| `OPENAI_MODEL`                         | Defines the OpenAI model used for anchor generation  |
+| `WEB_PUSH_PUBLIC_KEY`                  | Public VAPID key for browser push subscriptions      |
+| `WEB_PUSH_PRIVATE_KEY`                 | Private VAPID key for sending push notifications     |
+| `WEB_PUSH_SUBJECT`                     | Contact subject used for VAPID configuration         |
+| `STORAGE_KV_REST_API_URL`              | KV-compatible endpoint for operational reminder data |
+| `STORAGE_KV_REST_API_TOKEN`            | Token for KV-compatible operational storage          |
+| `CRON_SECRET`                          | Shared secret protecting scheduled cron endpoints    |
 
-When connecting a new Upstash or Vercel KV database through an integration, the generated variable names may not match the names used by Fenéla. Fenéla expects the `STORAGE_KV_*` names above.
+When a new Upstash or Vercel KV database is connected through an integration, generated environment-variable names may differ from the names Fenéla expects.
 
 ## Documentation
 
 For a technical review, the suggested reading order is:
 
-1. [Architecture overview](architecture/architecture-overview.md) — application structure, responsibilities and data flow.
-2. [AI and ethical-use guardrails](docs/product/ai-guardrails.md) — AI boundaries, safety decisions and user control.
-3. [Maintenance notes](docs/technical/maintenance-notes.md) — device cleanup, dependency maintenance and recurring operational details.
-4. [MVP scope](docs/product/mvp-scope.md) — implemented functionality and deliberate scope boundaries.
-
-Additional documentation:
-
-- [Known limitations](docs/product/known-limitations.md)
-- [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md)
-- [Local setup](docs/technical/local-setup.md)
+1. [Architecture overview](architecture/architecture-overview.md) — system boundaries, responsibilities and data flow.
+2. [MVP scope](docs/product/mvp-scope.md) — current product scope and deliberate exclusions.
+3. [AI and ethical-use guardrails](docs/product/ai-guardrails.md) — AI boundaries, safety decisions and user control.
+4. [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md) — stored data, ownership, deletion and retention.
+5. [Privacy notice](docs/product/privacy-notice.md) — deployment-facing privacy information and operator responsibilities.
+6. [Known limitations](docs/product/known-limitations.md) — current technical and product limitations.
+7. [Maintenance notes](docs/technical/maintenance-notes.md) — recurring operational and maintenance details.
+8. [Local setup](docs/technical/local-setup.md) — configuration and local validation.
 
 ## Author
 
 **Nadira Büsse**
 
-[LinkedIn](https://www.linkedin.com/in/nadirabusse)
-
 ## License
 
 Fenéla is available under the [MIT License](LICENSE).
-
-Attribution to the original project is appreciated when Fenéla or substantial parts of it are reused.

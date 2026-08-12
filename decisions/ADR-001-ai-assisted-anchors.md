@@ -52,7 +52,7 @@ The model configuration still allows some variation, so generated suggestions ar
 
 ## Impact
 
-The public AI route remains:
+AI-assisted anchor generation is exposed through the authenticated route:
 
 ```text
 /api/ai/anchors

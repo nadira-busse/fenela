@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/server/auth/requireUser";
 import { safeRedirectPath } from "@/lib/auth/safeRedirect";
 import { AuthPanel } from "./AuthPanel";
@@ -60,6 +61,17 @@ export default async function AuthPage({
               <AuthPanel next={next} />
             </div>
           )}
+
+          {/* Secondary, informational only — not a consent mechanism. Shown
+              in both the sign-in and signed-in states: this page doubles as
+              the app's only account/settings surface (see AccountLink in
+              CoachingScreen.tsx), so one link here covers both cases. */}
+          <Link
+            href="/privacy"
+            className="mt-6 block text-center text-xs font-medium text-[var(--text-soft)] underline underline-offset-2"
+          >
+            Privacy
+          </Link>
         </div>
       </div>
     </main>

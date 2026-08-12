@@ -2,29 +2,35 @@
 
 ## Status
 
-Accepted.
+Accepted and implemented.
 
 ## Context
 
-Fenéla MVP1 keeps most personal state in the current browser or installed PWA.
+Fenéla MVP1 kept most personal state in the current browser or installed PWA.
 
-That was a deliberate choice. It allowed the core product loop to be built and tested without introducing accounts, persistent profiles or cross-device synchronization before they were needed.
+That was a deliberate choice. It allowed the core product loop to be built and tested without introducing accounts, persistent profiles or cross-device ownership before those capabilities were needed.
 
-MVP2 changes that requirement.
+The product requirements later changed.
 
-Fenéla is intended to use information the user deliberately provides over more than one session. This includes goals, preferences, completed or postponed actions, user-entered friction and short weekly or monthly reflections.
+Fenéla needed to preserve information that the user deliberately provides across sessions, including:
 
-The current device-based model cannot provide reliable long-term ownership for that data.
+- preferences;
+- goals;
+- anchors;
+- completed, postponed and parked actions;
+- user-entered friction;
+- reflection history;
+- reminder preferences.
 
-A browser-generated device ID can separate records, but it is not a trustworthy user identity or authorization boundary.
+The device-based MVP1 model could not provide reliable long-term ownership for that data.
 
-MVP2 therefore needs a stable authenticated identity before personal history becomes persistent server-side data.
+A browser-generated device ID can correlate records with one browser installation, but it is not a trustworthy user identity or authorization boundary.
+
+Persistent personal history therefore required a stable authenticated identity.
 
 ## Decision
 
-MVP2 will introduce authenticated, user-owned persistence.
-
-The selected baseline is:
+Fenéla uses authenticated, user-owned persistence based on:
 
 ```text
 Next.js
@@ -34,21 +40,19 @@ Supabase Auth
 Supabase PostgreSQL
 ```
 
-Authentication will establish a stable user identity.
+Supabase Auth establishes the user's identity.
 
-Persistent application data will be related to that authenticated identity rather than to a client-provided user or device identifier.
+Persistent application data is associated with that authenticated identity rather than with a client-provided user or device identifier.
 
-The initial authentication experience should remain small:
+The implemented authentication experience uses passwordless email Magic Link.
 
-Google sign-in;
-passwordless email through Magic Link or OTP.
+Fenéla does not implement its own password-management system.
 
-Fenéla will not build its own password-management system unless a later requirement justifies it.
+The persistent domain is relational.
 
-The persistent model is relational.
+The main user-owned concepts are:
 
-Expected user-owned concepts include:
-
+```text
 User
 ├── UserPreference
 ├── ReminderPreference
@@ -59,77 +63,93 @@ User
 ├── Reflection
 └── Device
 └── PushSubscription
+```
 
-This is a conceptual domain model, not a fixed database schema.
+This domain model is represented through version-controlled PostgreSQL migrations rather than through a separate ORM layer.
 
-Schema details, constraints and indexes must still follow actual access patterns during implementation.
+PostgreSQL Row Level Security provides an additional ownership boundary.
 
-PostgreSQL Row Level Security will be used where appropriate as an additional ownership boundary.
+Application code still derives identity from the authenticated server session and applies ownership rules explicitly. RLS is a second boundary, not a replacement for application-level authorization.
 
-Application code must still derive the user identity from the authenticated session and enforce ownership explicitly.
+Supabase-generated TypeScript database types and explicit server-side data-access modules are used instead of introducing an ORM without a demonstrated need.
 
-MVP2 will not introduce an ORM by default.
+Existing MVP1 browser data was not migrated into authenticated persistence because there were no external production users whose local state needed to be preserved.
 
-Supabase-generated types and a small explicit data-access layer are the preferred starting point. An ORM should only be added if concrete query or mapping complexity later justifies it.
+Limited browser storage remains for local UI, compatibility and device-specific state where appropriate.
 
-No migration layer will be built for existing MVP1 browser data because there are no external production users whose current local state needs to be preserved.
+It is not the ownership source for authenticated account data.
 
 ## Reason
 
-Authentication is no longer being added only to protect reminder routes.
+Authentication supports a coherent set of product requirements:
 
-It now supports a coherent set of product requirements:
+- durable ownership;
+- persistent preferences;
+- goal continuity;
+- factual action history;
+- factual friction history;
+- deterministic reflection;
+- recovery after a new session;
+- account deletion;
+- inactivity retention;
+- authenticated device ownership.
 
-durable ownership;
-persistent preferences;
-goal continuity;
-action history;
-friction history;
-weekly reflection;
-monthly reflection;
-recovery after a new session;
-future multi-device continuity.
+Using Supabase for both authentication and PostgreSQL persistence keeps identity and account-owned data within one coherent boundary.
 
-Using one provider for authentication and PostgreSQL persistence keeps the architecture smaller than splitting identity and application data across separate services without a current need.
+PostgreSQL also matches Fenéla's domain well because the product depends on:
 
-PostgreSQL also matches the domain more directly than a document-first store because Fenéla needs clear ownership relationships and time-based historical queries.
+- explicit user ownership;
+- Goal and Anchor relationships;
+- immutable historical event records;
+- time-based reflection queries;
+- deterministic lifecycle behavior.
+
+The architecture deliberately avoids treating a device identifier as user identity.
 
 ## Trade-off
 
-MVP2 introduces responsibilities that MVP1 intentionally avoided:
+Authenticated persistence adds responsibilities that MVP1 intentionally avoided:
 
-authentication;
-authorization;
-relational persistence;
-account lifecycle;
-personal-data retention;
-account deletion;
-database migrations;
-stronger integration testing.
+- authentication;
+- authorization;
+- relational persistence;
+- database migrations;
+- Row Level Security;
+- account lifecycle;
+- data retention;
+- account deletion;
+- stronger ownership testing.
 
-The application becomes more complex.
+The application is therefore more complex than the original browser-local product.
 
-That complexity is accepted because it now supports real product behavior rather than speculative infrastructure.
+That complexity is accepted because it supports current product behavior rather than speculative infrastructure.
 
 The decision also creates a dependency on Supabase.
 
-The implementation should therefore keep Fenéla's domain and application logic separate from provider-specific details where that separation has a clear maintenance benefit.
+Fenéla's product and deterministic domain logic are therefore kept separate from provider-specific implementation details where that separation has a concrete maintenance benefit.
 
 ## Impact
 
-The MVP2 repository now implements authenticated, user-owned persistence for the core persisted domain state. Some browser-local compatibility state remains intentionally during the transition, and production deployment is handled separately from this ADR.
+Fenéla now has a server-derived authenticated identity for persistent user-owned state.
 
-MVP2 implementation must:
+The implementation:
 
-establish authenticated identity server-side;
-scope persistent data to that identity;
-prevent cross-user reads and writes;
-keep service credentials out of client code;
-use version-controlled database migrations;
-define account deletion and data lifecycle behavior;
-test authentication and authorization separately;
-preserve the current calm product flow.
+- establishes identity through Supabase Auth;
+- uses passwordless email Magic Link for sign-in;
+- scopes account-owned records to the authenticated user;
+- protects account-owned tables with Row Level Security;
+- keeps service credentials out of client code;
+- uses version-controlled database migrations;
+- persists preferences, Goals, Anchors, factual events and Reflections;
+- associates Devices and PushSubscriptions with authenticated ownership;
+- supports user-initiated account deletion;
+- supports deterministic inactivity retention;
+- preserves only limited local browser state where it still serves UI or device behavior.
 
-Authentication is infrastructure for continuity.
+Authentication remains infrastructure for continuity and ownership.
 
-It must not turn account management into a new product area.
+It does not turn account management into a separate product area.
+
+```
+
+```

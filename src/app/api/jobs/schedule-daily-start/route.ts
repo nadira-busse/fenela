@@ -3,9 +3,9 @@ import { getOptionalKvClient } from "@/lib/kv";
 import type { PushSubscription } from "web-push";
 
 import { DEVICES_SET_KEY, makeJob, storeJobForDevice, removeJobForDevice } from "@/lib/jobs";
-import { REMINDER_TIME_ZONE, parseHHMM, nextZonedOccurrenceMs } from "@/lib/timezone";
+import { nextZonedOccurrenceMs } from "@/lib/timezone";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getOptionalUser } from "@/server/auth/requireUser";
+import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
 import { verifyOwnDevice } from "@/server/devices/verifyOwnDevice";
 import { getOwnReminderPreference } from "@/server/reminders/getOwnReminderPreference";
 import { getOwnUserPreference } from "@/server/preferences/getOwnUserPreference";
@@ -30,7 +30,6 @@ export async function POST(req: Request) {
 
     const body = (await req.json().catch(() => ({}))) as {
       deviceId?: string;
-      startTime?: string;
     };
 
     const deviceId = body.deviceId;
@@ -39,74 +38,69 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing deviceId" }, { status: 400 });
     }
 
-    // Authenticated scheduling derives start_time/timezone from the
-    // canonical DB reminder preference + the user's own canonical
-    // timezone (Phase 4D §8/§16) — never from the client-supplied
-    // startTime/hardcoded zone, which remain the unauthenticated/legacy
-    // path's only source. The caller-supplied deviceId is only a
-    // candidate: it must be verified to belong to this authenticated user
-    // before it is used for anything (Phase 4D §9).
-    const user = await getOptionalUser();
-
-    let startTime: string;
-    let timeZone: string;
-
-    if (user) {
-      const ownsDevice = await verifyOwnDevice(deviceId);
-
-      if (!ownsDevice) {
+    try {
+      await requireUser();
+    } catch (error) {
+      if (error instanceof UnauthenticatedError) {
         return NextResponse.json(
           {
             ok: false,
             remindersEnabled: false,
-            error: "This device is not linked to your account. Please turn reminders on again.",
+            error: "Your session expired. Please sign in again.",
           },
-          { status: 403 }
+          { status: 401 }
         );
       }
 
-      const reminderPreference = await getOwnReminderPreference();
-
-      if (!reminderPreference || !reminderPreference.enabled) {
-        return NextResponse.json(
-          {
-            ok: false,
-            remindersEnabled: false,
-            error: "Daily reminders are not enabled for your account yet.",
-          },
-          { status: 409 }
-        );
-      }
-
-      const userPreference = await getOwnUserPreference();
-
-      if (!userPreference) {
-        return NextResponse.json(
-          {
-            ok: false,
-            remindersEnabled: false,
-            error: "Could not determine your timezone. Please try again.",
-          },
-          { status: 409 }
-        );
-      }
-
-      startTime = mapDbStartTimeToAppFormat(reminderPreference.start_time);
-      timeZone = userPreference.time_zone;
-    } else {
-      startTime = body.startTime ?? "08:00";
-      timeZone = REMINDER_TIME_ZONE;
-
-      if (!parseHHMM(startTime)) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Invalid startTime. Expected 'HH:MM' (e.g. '08:00').",
-          },
-          { status: 400 }
-        );
-      }
+      throw error;
     }
+
+    // Scheduling derives start_time/timezone from the canonical DB reminder
+    // preference and the user's own canonical timezone — never from a
+    // client-supplied value. The caller-supplied deviceId is only a
+    // candidate: it must be verified to belong to the authenticated user
+    // before it is used for anything.
+    const ownsDevice = await verifyOwnDevice(deviceId);
+
+    if (!ownsDevice) {
+      return NextResponse.json(
+        {
+          ok: false,
+          remindersEnabled: false,
+          error: "This device is not linked to your account. Please turn reminders on again.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const reminderPreference = await getOwnReminderPreference();
+
+    if (!reminderPreference || !reminderPreference.enabled) {
+      return NextResponse.json(
+        {
+          ok: false,
+          remindersEnabled: false,
+          error: "Daily reminders are not enabled for your account yet.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const userPreference = await getOwnUserPreference();
+
+    if (!userPreference) {
+      return NextResponse.json(
+        {
+          ok: false,
+          remindersEnabled: false,
+          error: "Could not determine your timezone. Please try again.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const startTime = mapDbStartTimeToAppFormat(reminderPreference.start_time);
+    const timeZone = userPreference.time_zone;
 
     const subscription = await kv.get<PushSubscription>(SUB_KEY(deviceId));
 

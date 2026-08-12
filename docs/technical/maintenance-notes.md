@@ -2,35 +2,100 @@
 
 This document records recurring maintenance details that do not belong in the product explanation or main architecture overview.
 
-It focuses on device cleanup, cross-platform dependency checks and known upstream behavior.
+It focuses on operational cleanup, account retention, dependency maintenance and known upstream behavior.
 
 ## Device records and cleanup
 
-MVP2 separates canonical account ownership in PostgreSQL from operational push-delivery state in KV. An authenticated browser/device has an owned `devices` row in PostgreSQL; KV stores delivery-oriented subscription/job pointers keyed by that device ID.
+Fenéla separates canonical account ownership in PostgreSQL from operational push-delivery state in KV.
 
-When a push subscription is confirmed terminally invalid (404/410), cleanup removes the PushSubscription and associated operational KV delivery state. The canonical PostgreSQL Device row is preserved; it is not reassigned or deleted as part of terminal-subscription cleanup.
+An authenticated browser or device has an owned `devices` row in PostgreSQL. KV stores operational subscription, job and delivery state keyed by that device ID.
 
-The cron worker therefore:
+When a push subscription is confirmed terminally invalid through a `404` or `410` response, cleanup removes the PushSubscription and associated operational KV state.
+
+The canonical PostgreSQL Device row is preserved. A failed or expired push endpoint does not mean the authenticated device ownership record itself is invalid.
+
+The push cron therefore:
 
 - skips devices without usable operational subscription state;
 - removes terminally invalid push-subscription state;
-- removes associated KV jobs/pointers;
+- removes associated KV jobs and pointers;
 - avoids rescheduling delivery to a subscription that can no longer receive notifications.
 
-Transient delivery failures such as network errors, 429 responses or 5xx responses do not delete the subscription or Device row.
+Transient delivery failures such as network errors, `429` responses or `5xx` responses do not delete the subscription or Device row.
 
 ## Account retention batch bound
 
-`/api/cron/retention` (see [Privacy and data lifecycle](../product/privacy-data-lifecycle.md)) scans Supabase Auth users page by page within a single invocation, bounded by `RETENTION_SCAN_MAX_PAGES` in `src/server/account/listInactiveAccountCandidates.ts` (currently 50 pages of 200 users, 10,000 accounts per run). If a run's user base ever exceeds that bound, the response reports `truncated: true` instead of silently scanning only part of the accounts — that signal should be watched if the account base grows.
+`/api/cron/retention` applies Fenéla's inactivity-retention policy.
 
-## Account activity signal (`user_activity`)
+The batch scans Supabase Auth users page by page within a single invocation. The scan is bounded by `RETENTION_SCAN_MAX_PAGES` in:
 
-Retention eligibility needs a server-observed "this account is actually being used" signal that advances on more than a fresh sign-in. That signal lives in its own table, `public.user_activity` (`user_id` primary key, `last_active_at`), not as a column on `user_preferences`:
+```text
+src/server/account/listInactiveAccountCandidates.ts
+```
 
-- every authenticated root-page request upserts the caller's own row (`src/server/account/touchOwnActivity.ts`), so the row exists from a user's very first authenticated request — before onboarding/`user_preferences` exists;
-- the write goes through the privileged admin client, not the normal session-scoped client — `authenticated` has no PostgreSQL grant on this table at all, so the timestamp the destructive retention decision depends on is never client-writable;
-- `service_role` has exactly `SELECT`, `INSERT`, `UPDATE` on this table (see `supabase/migrations/20260812120000_user_activity.sql`) — no `DELETE`; rows are removed only via the `auth.users` cascade, the same as every other account-owned table;
-- retention's effective activity signal is the more recent of `auth.users.last_sign_in_at` and `user_activity.last_active_at`; a missing `user_activity` row (or a missing/malformed value on either side) never counts as evidence of inactivity on its own — see `src/server/account/retentionPolicy.ts`.
+The current bound is:
+
+- 200 users per page;
+- 50 pages per invocation;
+- maximum 10,000 scanned accounts per run.
+
+If the account base exceeds that bound, the result reports:
+
+```text
+truncated: true
+```
+
+rather than silently presenting the partial scan as complete.
+
+That signal should be monitored if Fenéla grows beyond the current batch size.
+
+See [Privacy and data lifecycle](../product/privacy-data-lifecycle.md) for the retention policy itself.
+
+## Account activity signal
+
+Retention decisions use a server-observed activity signal stored in:
+
+```text
+public.user_activity
+```
+
+The table contains:
+
+```text
+user_id
+last_active_at
+```
+
+The activity timestamp is deliberately separate from `user_preferences`.
+
+This matters because an authenticated user can use Fenéla before a preferences row exists.
+
+Every authenticated root-page request updates the caller's own activity record through:
+
+```text
+src/server/account/touchOwnActivity.ts
+```
+
+The write uses the privileged server client.
+
+Authenticated browser clients do not receive direct PostgreSQL write access to `user_activity`, because the timestamp contributes to a destructive retention decision and must not be client-controlled.
+
+The relevant migration grants `service_role` only the operations needed to maintain the activity timestamp.
+
+Rows are removed through the `auth.users` ownership cascade rather than through a separate user-facing delete path.
+
+Retention uses the most recent valid value from:
+
+- `auth.users.last_sign_in_at`;
+- `user_activity.last_active_at`.
+
+Missing or malformed activity values do not count as evidence of inactivity by themselves.
+
+The deterministic retention rules live in:
+
+```text
+src/server/account/retentionPolicy.ts
+```
 
 ## Maintenance scripts
 
@@ -45,7 +110,9 @@ scripts/cleanup-all-devices.mjs
 
 This legacy maintenance script audits KV-registered device IDs and removes operational KV records that no longer have an active push subscription.
 
-It does not delete canonical PostgreSQL `devices` rows. Use it only when development or repeated browser resets have left stale KV delivery records.
+It does not delete canonical PostgreSQL `devices` rows.
+
+Use it only when development, repeated browser resets or reminder testing have left stale KV delivery records.
 
 ### `cleanup-all-devices.mjs`
 
@@ -57,17 +124,17 @@ This destructive maintenance script clears the reminder system's KV-managed oper
 - daily reminder pointers;
 - legacy reminder keys covered by the script.
 
-It does not remove canonical PostgreSQL account-owned Device rows or ReminderPreference rows.
+It does not remove canonical PostgreSQL Device rows or ReminderPreference rows.
 
-This is a destructive reset. The script requires explicit confirmation before deleting data.
+The script requires explicit confirmation before deleting data.
 
-Storage credentials are read from the local environment and are not included in the repository.
+Storage credentials are read from the local environment and are never stored in the repository.
 
-## Cross-platform dependency checks
+## Dependency and cross-platform checks
 
-Fenéla is developed on Windows and has also been validated in Linux through WSL.
+Fenéla is developed on Windows and the current repository state has been validated on both Windows and Linux through WSL.
 
-A dependency update previously produced a `package-lock.json` that worked on Windows but failed during `npm ci` on Linux because platform-specific optional dependency entries were missing.
+Cross-platform validation exposed a lockfile issue where `package-lock.json` worked on Windows but failed during Linux `npm ci` because platform-specific optional dependency entries were missing.
 
 The lockfile was repaired in Linux with:
 
@@ -76,27 +143,64 @@ npm install --package-lock-only
 npm ci
 ```
 
-After dependency or lockfile changes, verify installation in both environments:
+After future dependency or lockfile changes, cross-platform verification on Linux or WSL is recommended because platform-specific optional dependencies can affect installation even when Windows validation succeeds.
 
-- Windows;
-- Linux or WSL.
+The standard validation flow is documented in [Local setup](local-setup.md).
 
-The full validation flow is documented in [Local setup](local-setup.md).
+## Supabase CLI version
+
+The local setup documentation uses the Supabase CLI version that was validated with this repository:
+
+```text
+2.113.0
+```
+
+Setup commands therefore use an explicit version such as:
+
+```bash
+npx supabase@2.113.0 status
+```
+
+This avoids silently changing local database behavior when a newer CLI release becomes available.
+
+If the project deliberately upgrades the Supabase CLI, update and validate the documented version as part of the same change.
+
+## Generated database types
+
+Database types are committed in:
+
+```text
+src/types/database.types.ts
+```
+
+They only need to be regenerated after a database schema change.
+
+The generated file must also be formatted before commit, because raw Supabase CLI output does not necessarily satisfy the repository's Prettier configuration.
+
+The exact contributor command is documented in [Local setup](local-setup.md).
 
 ## Upstream `url.parse()` warning
 
 Production logs may show Node warning `DEP0169` related to `url.parse()`.
 
-Fenéla does not call `url.parse()` directly. The warning originates from the upstream `web-push` dependency.
+Fenéla does not call `url.parse()` directly.
+
+The warning originates from the upstream `web-push` dependency.
 
 No application-code workaround is currently required.
 
-Review this note after future `web-push` updates. It can be removed when the dependency no longer produces the warning or when the repository adopts a confirmed compatible fix.
+Review this note after future web-push updates. It can be removed when the dependency no longer produces the warning or when the repository adopts a confirmed compatible fix.
 
 ## Maintenance boundary
 
 This file is not a release log.
 
-Dated test counts, audit snapshots and one-time debugging history belong in CI, release notes or the relevant setup documentation.
+Dated test counts, one-time debugging history, sprint details and temporary development observations do not belong here.
 
-Update this file only when a recurring maintenance issue, destructive operation or non-obvious dependency behavior needs to remain visible.
+Keep a note only when it describes:
+
+- a recurring maintenance requirement;
+- a destructive operation;
+- a non-obvious operational constraint;
+- a dependency issue that may reasonably recur;
+- a repository-specific verification requirement.

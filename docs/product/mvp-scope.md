@@ -1,8 +1,8 @@
 # MVP Scope
 
-This document defines the boundary of Fenéla MVP 1.
+This document defines the current product boundary of Fenéla.
 
-The current version supports a focused path from one stated goal to a small set of anchors, one action at a time and daily return.
+The current version supports a focused path from one stated goal to a small set of anchors, one action at a time and daily return — now backed by an authenticated account rather than local-only state.
 
 Features outside that path are not part of the current scope.
 
@@ -134,11 +134,21 @@ This infrastructure supports reminders but remains separate from the main user f
 
 ### 9. Authenticated and device-local state
 
+Fenéla uses passwordless email Magic Link for sign-in.
+
 For authenticated users, canonical user preferences, reminder preferences, Goals, Anchors and factual event history are persisted in PostgreSQL and scoped to the authenticated account. Devices and push subscriptions are also account-owned.
 
-Some UI/day-state compatibility data remains browser-local. Push subscriptions remain device-specific even though their ownership is authenticated. Full multi-device fanout is not part of the current MVP2 implementation. Account lifecycle — user-initiated permanent account deletion and 12-month inactivity retention — is implemented; see [Privacy and data lifecycle](privacy-data-lifecycle.md).
+Some UI and day-state data remains browser-local. Push subscriptions remain device-specific and are associated with authenticated device ownership. Account lifecycle — user-initiated permanent account deletion and 12-month inactivity retention — is implemented; see [Privacy and data lifecycle](privacy-data-lifecycle.md).
 
-### 10. Public documentation
+### 10. Weekly reflection
+
+Once a week, Fenéla generates a short reflection from the account's own persisted ActionEvent/FrictionEvent history: what came back, what got completed or postponed, what felt hard. The facts are derived deterministically from stored history, not decided by AI — see [ADR-005: Deterministic Reflection History](../../decisions/ADR-005-deterministic-reflection-history.md).
+
+Fenéla provides a deterministic weekly reflection based on recorded action and friction history.
+
+The underlying period and aggregation logic also supports monthly periods, but Fenéla does not expose a monthly reflection flow.
+
+### 11. Public documentation
 
 The public repository documents:
 
@@ -158,9 +168,9 @@ The current release does not include:
 - direct editing of an already saved anchor set;
 - manual anchor reordering;
 - journaling-style free-form reflection history;
+- a user-facing monthly reflection;
 - full multi-device synchronization or fanout;
 - dashboards or extensive progress tracking;
-- journaling;
 - long-term trend analysis;
 - analytics;
 - streaks or heavy gamification;
@@ -170,21 +180,3 @@ The current release does not include:
 - admin tooling.
 
 A later version may add selected capabilities when they support a clear user need and fit the product’s calm interaction model.
-
-## MVP2 implementation status
-
-MVP2 is actively implemented in the repository. Authenticated user-owned persistence, historical ActionEvent/FrictionEvent data, reminder/device ownership, deterministic weekly/monthly reflection persistence, and account deletion with 12-month inactivity retention are all implemented and validated in the development branch.
-
-The production deployment has not yet been updated to this final MVP2 state.
-
-The governing decisions are documented in:
-
-- [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-authenticated-user-owned-persistence.md)
-- [ADR-004: Reminder Preferences and Device Ownership](../../decisions/ADR-004-reminder-preferences-and-device-ownership.md)
-- [ADR-005: Deterministic Reflection History](../../decisions/ADR-005-deterministic-reflection-history.md)
-
-Account deletion and data retention are documented in [Privacy and data lifecycle](privacy-data-lifecycle.md).
-
-MVP2 does not change the product boundary.
-
-It is intended to help Fenéla remember relevant user-owned history and support gradual development of routines the user has chosen themselves. It is not intended to add general productivity management, performance scoring or psychological profiling.

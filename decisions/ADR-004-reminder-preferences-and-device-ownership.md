@@ -2,36 +2,40 @@
 
 ## Status
 
-Accepted.
+Accepted and implemented.
 
 ## Context
 
-Fenéla MVP1 uses a locally generated device ID to connect:
+Fenéla MVP1 used a locally generated device ID to connect:
 
 - push subscriptions;
 - scheduled reminder jobs;
 - reminder cancellation;
 - daily reminder state.
 
-This works as a lightweight device correlation mechanism.
+That worked as a lightweight device-correlation mechanism.
 
-It is not a reliable authorization boundary because the device ID is supplied by the client.
+It was not a reliable authorization boundary because the device ID came from the client.
 
-The current implementation also stores the daily reminder time in more than one place.
+The earlier implementation also represented daily reminder settings in more than one place.
 
-Screening stores a start time as part of the screening state. The coaching settings flow can later store the same concept under a separate local value.
+Screening stored a reminder choice and start time, while the coaching settings flow could later maintain the same concept through separate local values.
 
-These values can diverge even though they represent the same user preference.
+Those representations could diverge even though they described one user preference.
 
-The MVP2 input audit also showed that reminder preference and push delivery are currently mixed conceptually.
+The underlying design also mixed three different concepts:
 
-A user's choice to receive a reminder is not the same thing as the technical push subscription that can deliver it.
+- whether the user wants reminders;
+- which device belongs to that user;
+- which technical push endpoint can receive a notification.
+
+These responsibilities needed separate ownership boundaries.
 
 ## Decision
 
-MVP2 will separate reminder preference from delivery infrastructure.
+Fenéla separates reminder preference from delivery infrastructure.
 
-The conceptual model becomes:
+The domain model is:
 
 ```text
 User
@@ -40,87 +44,104 @@ User
     └── PushSubscription
 ```
 
-ReminderPreference represents what the user wants.
+## ReminderPreference
 
-It is expected to contain the user-level reminder configuration needed by the product, including:
+ReminderPreference represents the user's product-level choice.
 
-enabled
-start_time
-timezone
+It stores the canonical reminder configuration, including:
 
-The exact database shape will be finalized during implementation.
+- enabled state;
+- daily start time.
 
-Device represents a device or browser installation belonging to an authenticated user.
+The user's timezone is stored as part of the user preference context used for local-calendar interpretation.
 
-PushSubscription represents the technical endpoint used to deliver notifications to that device.
+The onboarding reminder choice and later reminder settings update the same canonical preference rather than maintaining independent representations.
 
-A device is not a user identity.
+## Device
 
-A push subscription is not a reminder preference.
+`Device` represents a browser or device installation associated with an authenticated user.
 
-MVP2 will also use one canonical daily reminder time.
+A device identifier is useful for operational correlation.
 
-The onboarding value and the later settings value will no longer be stored as two independent representations of the same preference.
+It is not user identity and is not treated as an authorization credential.
 
-Changing the reminder time later updates the same persistent preference established during onboarding.
+## PushSubscription
 
-Reminder operations will derive ownership from the authenticated user.
+`PushSubscription` represents the technical Web Push endpoint associated with a verified Device.
 
-Client-provided device identifiers must not act as authorization credentials.
+A push subscription describes delivery capability.
 
-Rate limiting remains separate from authentication and authorization and will be retained where it still protects against abuse or unnecessary cost.
+It does not describe whether the user currently wants a daily reminder.
+
+Authenticated reminder operations derive ownership from the current server session and verified Device association.
+
+Rate limiting remains separate from authentication and authorization. It protects routes that can create operational storage growth or external cost.
 
 ## Reason
 
-The current model combines three different responsibilities:
+The earlier model combined three responsibilities:
 
-user preference
-device identity
-push delivery
+```text
+- user preference
+- device ownership
+- push delivery
+```
 
-Separating them makes ownership and behavior easier to reason about.
+Separating them makes each boundary explicit.
 
-It also removes duplicated state around the reminder start time.
+The resulting model answers three different questions:
 
-The resulting model answers three different questions explicitly:
-
+```text
 What does the user want?
 → ReminderPreference
 
 Which device belongs to the user?
 → Device
 
-Where can a push message be delivered?
+Where can a notification be delivered?
 → PushSubscription
+```
 
-This provides a cleaner basis for future multi-device support without requiring multi-device complexity in the first MVP2 implementation.
+The design also removes duplicated reminder-time state for authenticated users.
+
+Product preference can therefore change without treating a push endpoint as the preference itself.
 
 ## Trade-off
 
-The reminder model gains one additional domain concept.
+The reminder system has more explicit structure than the original device-only model.
 
-That is more structure than MVP1 needs.
+That additional structure is accepted because it resolves existing ambiguity around ownership and duplicated state.
 
-The extra concept is accepted because it removes an existing ambiguity rather than creating abstraction for future possibilities.
+Operational delivery remains device-specific.
 
-MVP2 will also need to define how reminder delivery behaves when a user has more than one registered device.
+Fenéla does not introduce a broader multi-device notification system unless a concrete product requirement justifies that additional complexity.
 
-That behavior should remain minimal until a real multi-device use case needs more sophistication.
+Push delivery also remains dependent on:
+
+- browser support;
+- notification permission;
+- service worker behavior;
+- device behavior;
+- operational configuration.
+
+Reminder delivery therefore cannot be treated as guaranteed.
 
 ## Impact
 
-MVP2 implementation must:
+Fenéla now:
 
-persist one canonical reminder preference;
-associate devices with authenticated users;
-associate push subscriptions with devices;
-remove device ID as pseudo-authorization;
-update scheduling and cancellation routes to use authenticated ownership;
-preserve the user's ability to enable, disable and reschedule reminders;
-retain failure behavior that does not block the core Fenéla flow.
+- persists one canonical ReminderPreference for an authenticated user;
+- associates Devices with authenticated users;
+- associates PushSubscriptions with owned Devices;
+- does not use a device ID as pseudo-authorization;
+- derives authenticated ownership server-side;
+- uses the same reminder preference from onboarding and later settings;
+- allows the user to enable, disable and reschedule reminders;
+- keeps reminder failures from blocking the core accountability flow;
+- separates canonical PostgreSQL ownership from KV-backed operational scheduling.
 
-Timezone handling must also become explicit before reminder and reflection periods are finalized.
+Timezone handling is explicit in the persisted user context and reminder scheduling flow.
 
-Absolute timestamps should remain separate from the user's local calendar interpretation.
+Absolute timestamps remain separate from local calendar interpretation.
 
-The exact week boundary and timezone UX are implementation decisions that must be resolved before weekly and monthly aggregation is considered complete.
+The reminder architecture supports the current product without requiring speculative multi-device behavior.

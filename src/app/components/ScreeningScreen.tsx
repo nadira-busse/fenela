@@ -402,7 +402,7 @@ export default function ScreeningScreen({ onDone }: Props) {
               options={[
                 { value: "START", label: "Starting things" },
                 { value: "SUSTAIN", label: "Keeping going once I start" },
-                { value: "BOUNDARIES", label: "Protecting boundaries / not overdoing it" },
+                { value: "BOUNDARIES", label: "Protecting boundaries" },
               ]}
             />
           </Section>

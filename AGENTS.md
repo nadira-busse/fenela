@@ -59,12 +59,12 @@ overwhelm
 → return
 ```
 
-MVP2 extends this with persistent continuity and limited reflection, but the core product remains the same.
+Fenéla supports persistent continuity and a limited weekly reflection while keeping the core product small.
 
 Do not introduce without explicit approval:
 
 - project management;
-- kanban;
+- project-management boards;
 - generic task lists;
 - calendar planning;
 - time tracking;
@@ -80,33 +80,37 @@ Do not introduce without explicit approval:
 - hidden personality models;
 - broad life coaching.
 
-Weekly and monthly reflection must remain short and supportive.
+Weekly reflection must remain short and supportive.
 
-They must not become analytics dashboards or productivity reports.
+The existing monthly reflection primitives must not be expanded into a user-facing flow unless explicitly requested.
+
+Reflection must not become an analytics dashboard or productivity report.
 
 ---
 
-# 3. Current product evolution
+# 3. Current product state
 
-Fenéla MVP1 is an existing working application.
-
-MVP1 intentionally used a relatively simple local-first architecture.
-
-MVP2 is a separate architectural evolution toward:
+Fenéla currently includes:
 
 - authenticated users;
 - user-owned persistence;
-- historical action data;
-- friction history;
-- weekly reflection;
-- monthly reflection;
-- stronger reminder ownership.
+- historical action and friction data;
+- optional reminders with authenticated device ownership;
+- deterministic weekly reflection;
+- technical monthly reflection primitives without a user-facing monthly flow;
+- user-initiated account deletion;
+- inactivity retention.
 
-Do not retroactively treat MVP1 architecture as an error.
+Treat these as established product and architecture behavior.
 
-Requirements changed, so architecture may change.
+Do not rebuild, replace or reopen an established subsystem without:
 
-Do not represent MVP2 capabilities as implemented until they actually exist and have been tested.
+- a concrete defect;
+- a changed requirement;
+- new evidence;
+- an explicit task.
+
+Do not add a monthly user-facing reflection unless a task explicitly requests it.
 
 ---
 
@@ -144,7 +148,7 @@ If an unrelated issue is found:
 
 Do not expand a focused task into a repository-wide cleanup.
 
-Do not introduce future-version functionality while implementing the current phase.
+Do not introduce functionality outside the approved task or current product scope
 
 ---
 
@@ -195,7 +199,6 @@ Persistent user-owned state must not rely solely on browser storage when it is r
 - account continuity;
 - recovery;
 - weekly reflection;
-- monthly reflection;
 - ownership;
 - historical accuracy.
 
@@ -207,7 +210,7 @@ Never trust caller-supplied identifiers as proof of ownership.
 
 # 8. Authentication and authorization
 
-MVP2's approved architectural direction is:
+Fenéla's authentication and persistence architecture is:
 
 ```text
 Supabase Auth
@@ -288,7 +291,7 @@ Do not add an ORM simply because PostgreSQL is present.
 
 # 11. Historical events
 
-MVP2 may store structured historical records such as:
+Fenéla stores structured historical records such as:
 
 - completed action;
 - postponed action;
@@ -308,7 +311,7 @@ unless a later concrete requirement requires them.
 
 The purpose of event history is limited:
 
-> reliably reconstruct relevant Fenéla activity over a week or month.
+> reliably reconstruct relevant Fenéla activity for deterministic reflection.
 
 ---
 
@@ -338,7 +341,7 @@ User-entered friction must be treated as the user's own explanation of a specifi
 It may support:
 
 - weekly reflection;
-- monthly reflection;
+- deterministic reflection aggregation;
 - adjustment of future anchors;
 - factual identification of repeated in-app situations.
 
@@ -358,9 +361,11 @@ It does not infer diagnoses, personality traits or psychological conditions.
 
 ---
 
-# 14. Weekly and monthly reflection
+# 14. Reflection
 
-Historical facts must be computed deterministically.
+Weekly reflection is the current user-facing reflection flow.
+
+The codebase also contains deterministic monthly period and aggregation primitives. These are technical support only and must not be treated as an unfinished product feature.
 
 Preferred architecture:
 
@@ -389,7 +394,7 @@ The AI model is not the source of truth for:
 
 Weekly reflection supports small short-term adjustment.
 
-Monthly reflection makes gradual routine development visible.
+Monthly reflection, if and when it ships a user-facing flow, would make gradual routine development visible.
 
 Neither should become a detailed analytics or performance system.
 
@@ -450,15 +455,13 @@ Do not expose:
 
 to client-side code or the public repository.
 
-Account deletion must eventually remove associated user-owned application data according to the approved data lifecycle.
+Account deletion must remove associated user-owned application data according to the approved data lifecycle.
 
 ---
 
 # 17. Reminders and devices
 
 A device is not a user identity.
-
-MVP2's intended direction is:
 
 ```text
 User
@@ -480,7 +483,7 @@ Do not remove existing abuse controls simply because authentication is introduce
 
 Timezone behavior must be explicit.
 
-Weekly and monthly aggregation, day boundaries and reminder scheduling must not rely on an undocumented timezone assumption.
+Calendar-based reflection aggregation and reminder scheduling must not rely on an undocumented timezone assumption.
 
 When modifying date/time behavior, define:
 
@@ -578,7 +581,7 @@ For deterministic logic:
 
 > identical input should produce identical factual output.
 
-AI wording itself may vary.
+AI-generated anchor wording may vary.
 
 AI inputs, validation and fallback behavior must still be testable.
 
@@ -610,13 +613,25 @@ If a required command cannot run because of the environment:
 
 Do not claim a check passed if it was not actually executed successfully.
 
+### Formatting responsibility
+
+When you modify repository text/code files, format the files you changed before returning the task for review.
+
+Use Prettier in write mode only on the files changed by the current task.
+
+Do not run the full repository `npm run format:check` unless the task explicitly asks for final repository validation.
+
+Formatting is part of completing an edit; it is not considered a full validation pass.
+
+Before reporting `READY FOR REVIEW`, changed Prettier-managed files must already match repository formatting.
+
 ---
 
 # 24. Documentation
 
 Documentation is part of the engineering output.
 
-When runtime behavior changes, update relevant documentation in the same phase unless the task explicitly separates documentation work.
+When runtime behavior changes, update relevant documentation as part of the same change unless the task explicitly separates documentation work.
 
 Keep claims aligned with implementation.
 
@@ -628,8 +643,6 @@ Use precise status language:
 - designed;
 - planned;
 - not implemented.
-
-Do not describe future MVP2 functionality as current behavior.
 
 Architecture documentation may use precise technical language.
 
@@ -682,13 +695,15 @@ Keep the repository:
 
 Do not commit:
 
-- `.env`;
+- real environment files such as `.env`, `.env.local`, `.env.development`, `.env.test` or `.env.production`;
 - credentials;
+- API keys, tokens or other secrets;
 - local private files;
 - debug dumps;
 - temporary exports;
-- secrets;
 - machine-specific artifacts.
+
+`.env.example` is the public configuration template and may be committed. It must contain placeholders only and never real secrets.
 
 Respect `.gitignore`, but also verify that previously tracked files are appropriate for publication.
 
@@ -696,13 +711,13 @@ Respect `.gitignore`, but also verify that previously tracked files are appropri
 
 # 27. Private agent working context
 
-The repository may contain a local, Git-ignored directory:
+Local development uses a Git-ignored directory for non-public working context:
 
 ```text
 .agent-private/
 ```
 
-This directory is reserved for non-public working context used by Nadira and coding agents.
+This directory is reserved for temporary AI-assisted development context and must never be committed.
 
 Examples include:
 
@@ -779,7 +794,7 @@ For every task:
 
 Do not improvise additional features.
 
-Do not continue into the next project phase without explicit instruction.
+Do not continue into additional work or scope without explicit instruction.
 
 If a task says analysis-only or documentation-only, do not modify runtime code.
 

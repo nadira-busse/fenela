@@ -28,12 +28,14 @@ vi.mock("@/lib/rateLimit", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
 }));
 
-// These existing tests exercise the unauthenticated/legacy path (Phase 4D
-// §9 added authenticated Device ownership verification on top, unchanged
-// for anonymous callers).
-vi.mock("@/server/auth/requireUser", () => ({
-  getOptionalUser: vi.fn().mockResolvedValue(null),
-}));
+const { requireUser, UnauthenticatedError } = vi.hoisted(() => {
+  class UnauthenticatedError extends Error {}
+  return { requireUser: vi.fn(), UnauthenticatedError };
+});
+vi.mock("@/server/auth/requireUser", () => ({ requireUser, UnauthenticatedError }));
+
+const { verifyOwnDevice } = vi.hoisted(() => ({ verifyOwnDevice: vi.fn() }));
+vi.mock("@/server/devices/verifyOwnDevice", () => ({ verifyOwnDevice }));
 
 import { POST } from "./route";
 
@@ -50,6 +52,12 @@ describe("POST /api/jobs/schedule-reminder", () => {
     getOptionalKvClient.mockReturnValue({ sadd: vi.fn() });
     makeJob.mockClear();
     storeJobForDevice.mockClear();
+
+    requireUser.mockReset();
+    verifyOwnDevice.mockReset();
+
+    requireUser.mockResolvedValue({ id: "user-a" });
+    verifyOwnDevice.mockResolvedValue(true);
   });
 
   it("truncates an oversized title and body instead of storing them in full", async () => {
@@ -97,5 +105,44 @@ describe("POST /api/jobs/schedule-reminder", () => {
     const maxExpectedDueAt = before + 30 * 60 * 1000 + 1000; // default window + margin
 
     expect(storedJob.dueAt).toBeLessThanOrEqual(maxExpectedDueAt);
+  });
+
+  it("missing deviceId: rejected before any auth or ownership check", async () => {
+    const response = await POST(makeRequest({}) as unknown as Request);
+
+    expect(response.status).toBe(400);
+    expect(requireUser).not.toHaveBeenCalled();
+    expect(verifyOwnDevice).not.toHaveBeenCalled();
+  });
+
+  it("unauthenticated: rejected with 401 and no job is stored", async () => {
+    requireUser.mockRejectedValue(new UnauthenticatedError("no session"));
+
+    const response = await POST(makeRequest({ deviceId: "device-1" }) as unknown as Request);
+
+    expect(response.status).toBe(401);
+    expect(verifyOwnDevice).not.toHaveBeenCalled();
+    expect(storeJobForDevice).not.toHaveBeenCalled();
+  });
+
+  it("auth verification/infrastructure failure: fails closed and no job is stored", async () => {
+    class AuthVerificationError extends Error {}
+    requireUser.mockRejectedValue(new AuthVerificationError("Auth service unavailable"));
+
+    const response = await POST(makeRequest({ deviceId: "device-1" }) as unknown as Request);
+    const data = await response.json();
+
+    expect(data.ok).toBe(false);
+    expect(verifyOwnDevice).not.toHaveBeenCalled();
+    expect(storeJobForDevice).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the authenticated caller's device id does not belong to them", async () => {
+    verifyOwnDevice.mockResolvedValue(false);
+
+    const response = await POST(makeRequest({ deviceId: "not-my-device" }) as unknown as Request);
+
+    expect(response.status).toBe(403);
+    expect(storeJobForDevice).not.toHaveBeenCalled();
   });
 });
