@@ -14,8 +14,16 @@ import { getOrCreateDeviceId, setDeviceId } from "@/lib/device";
 import { getBrowserTimeZone } from "@/lib/browserTimeZone";
 import { saveUserPreferenceAction } from "@/server/preferences/saveUserPreferenceAction";
 import { saveReminderPreferenceAction } from "@/server/reminders/saveReminderPreferenceAction";
+import {
+  resolveScreeningReminderOutcome,
+  type ScreeningReminderOutcome,
+} from "../screeningReminderOutcome";
 
-type Props = { onDone: () => void };
+// Reports the reminder preference that is now actually persisted in
+// `reminder_preferences`, so HomeClient can reflect it immediately instead
+// of waiting for the next full page load (the "screening Yes -> Home shows
+// Off" defect this fixes).
+type Props = { onDone: (reminder: ScreeningReminderOutcome) => void };
 
 type PushSubscriptionJSON = {
   endpoint: string;
@@ -153,6 +161,11 @@ export default function ScreeningScreen({ onDone }: Props) {
     message: string;
     canRetryAuth: boolean;
   } | null>(null);
+  // The reminder outcome actually persisted this submission, used by
+  // handleContinueWithoutReminders below (a separate, later click) once the
+  // reminder_preferences write has already succeeded but a later technical
+  // step (permission/subscription/scheduling) failed.
+  const [persistedReminder, setPersistedReminder] = useState<ScreeningReminderOutcome | null>(null);
 
   const antiHelpOptions: { key: AntiHelp; label: string }[] = useMemo(
     () => [
@@ -236,8 +249,15 @@ export default function ScreeningScreen({ onDone }: Props) {
         return;
       }
 
+      const persisted = resolveScreeningReminderOutcome({
+        reminderPreferenceSaved: true,
+        dailyReminder,
+        startTime,
+      });
+      setPersistedReminder(persisted);
+
       if (dailyReminder === "NOT_NOW") {
-        onDone();
+        onDone(persisted);
         return;
       }
 
@@ -264,7 +284,7 @@ export default function ScreeningScreen({ onDone }: Props) {
         return;
       }
 
-      onDone();
+      onDone(persisted);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown reminder setup error";
 
@@ -283,7 +303,19 @@ export default function ScreeningScreen({ onDone }: Props) {
 
   const handleContinueWithoutReminders = () => {
     saveCurrentScreening("NOT_NOW");
-    onDone();
+
+    // Reused when reached after a reminder_preferences write already
+    // succeeded (permission/subscription/scheduling failed afterwards): the
+    // DB row genuinely holds that persisted value, so it must be reported
+    // as-is rather than overwritten with a fabricated "opted out" outcome.
+    onDone(
+      persistedReminder ??
+        resolveScreeningReminderOutcome({
+          reminderPreferenceSaved: false,
+          dailyReminder,
+          startTime,
+        })
+    );
   };
 
   const canSubmit = name.trim().length > 0;

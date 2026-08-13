@@ -27,6 +27,7 @@ import {
   type PersistedReminderPreference,
 } from "./authenticatedLocalSync";
 import { createAuthenticatedOwnershipStore } from "./authenticatedOwnershipStore";
+import { resolveReminderPreference } from "./reminderPreferenceOverride";
 import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
 import { createGoalWithAnchorsAction } from "@/server/goals/createGoalWithAnchorsAction";
 import { archiveActiveGoalAction } from "@/server/goals/archiveActiveGoalAction";
@@ -108,6 +109,16 @@ export default function HomeClient({
 
   const [screeningDoneOverride, setScreeningDoneOverride] = useState<boolean | null>(null);
 
+  // undefined = defer to the server-provided `reminderPreference` prop
+  // (same three-state override pattern as intakeOverride/goalIdOverride
+  // above). Set the instant screening finishes so Coaching reflects the
+  // just-persisted reminder_preferences row immediately, instead of the
+  // stale prop captured by the server render that happened before
+  // screening ran (Phase 4I — the "screening Yes -> Home shows Off" defect).
+  const [reminderPreferenceOverride, setReminderPreferenceOverride] = useState<
+    PersistedReminderPreference | null | undefined
+  >(undefined);
+
   const [intakeOverride, setIntakeOverride] = useState<Intake | null | undefined>(undefined);
 
   // Same three-state override pattern as intakeOverride: undefined = defer
@@ -178,10 +189,16 @@ export default function HomeClient({
   // prop, which only reflects state as of the last server render.
   const goalId = (goalIdOverride !== undefined ? goalIdOverride : activeGoal?.id) ?? undefined;
 
-  const handleCompleteScreening = () => {
+  const handleCompleteScreening = (reminder: PersistedReminderPreference) => {
     setScreeningDoneOverride(true);
     saveToStorage(LS_SCREENING_DONE_KEY, true);
+    setReminderPreferenceOverride(reminder);
   };
+
+  const effectiveReminderPreference = resolveReminderPreference(
+    reminderPreferenceOverride,
+    reminderPreference
+  );
 
   // Goal data complete + final Anchor set chosen is the persistence
   // boundary (Phase 4B §16) — not shown to the user until this succeeds
@@ -278,7 +295,7 @@ export default function HomeClient({
             key={coachMountKey}
             intake={intake}
             goalId={goalId}
-            reminderPreference={goalId ? reminderPreference : null}
+            reminderPreference={goalId ? effectiveReminderPreference : null}
             onResetEverything={resetEverything}
             onRestartDay={restartDay}
             newGoalPending={archivingNewGoal}

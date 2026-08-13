@@ -160,7 +160,7 @@ function stateNeedsActiveTask(state: EnhancedCoachState) {
   );
 }
 
-function getInitialReminderStatus(enabled: boolean): ReminderStatus {
+export function getInitialReminderStatus(enabled: boolean): ReminderStatus {
   if (typeof window === "undefined") return "unknown";
 
   const permission = getNotificationPermission();
@@ -326,7 +326,7 @@ function ReminderSettings({
             type="button"
             onClick={onDisableDailyReminders}
             disabled={isBusy}
-            className="rounded-2xl bg-[var(--cta-secondary)] px-4 py-3 text-sm font-bold text-[var(--cta-secondary-text)] disabled:opacity-60"
+            className="w-full rounded-2xl bg-[var(--cta-secondary)] px-4 py-3 text-sm font-bold text-[var(--cta-secondary-text)] disabled:opacity-60"
           >
             {isBusy ? "Saving..." : "Turn off"}
           </button>
@@ -345,7 +345,7 @@ function ReminderSettings({
           type="button"
           onClick={onSaveDailyReminderTime}
           disabled={isBusy}
-          className="rounded-2xl bg-[var(--cta-secondary)] px-4 py-3 text-sm font-bold text-[var(--cta-secondary-text)] disabled:opacity-60"
+          className="w-full rounded-2xl bg-[var(--cta-secondary)] px-4 py-3 text-sm font-bold text-[var(--cta-secondary-text)] disabled:opacity-60"
         >
           {isBusy ? "Saving..." : "Save time"}
         </button>

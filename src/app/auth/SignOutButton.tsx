@@ -54,7 +54,7 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={pending}
-      className="rounded-lg border border-[var(--text-main)]/20 px-4 py-3 text-sm font-medium text-[var(--text-main)] disabled:opacity-60"
+      className="w-full rounded-2xl bg-[var(--cta-secondary)] px-4 py-3 text-sm font-bold text-[var(--cta-secondary-text)] disabled:opacity-60"
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>
