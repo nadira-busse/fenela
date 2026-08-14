@@ -135,13 +135,13 @@ http://localhost:3000/auth
 
 Enter an email address and request a Magic Link.
 
-The local Supabase stack captures outgoing authentication email in Mailpit:
+The local Supabase stack captures outgoing authentication email in Mailpit. Find the Mailpit URL in the `MAILPIT_URL` field of:
 
-```text
-http://127.0.0.1:54324
+```bash
+npx supabase@2.113.0 status
 ```
 
-Open the email in Mailpit and follow the Magic Link.
+Open that URL, find the email in Mailpit, and follow the Magic Link.
 
 The link returns through:
 
@@ -349,6 +349,24 @@ Ctrl + C
 
 Then run the command again as a complete command.
 
+### `supabase start` fails with a port bind error on Windows
+
+If `npx supabase@2.113.0 start` fails with an error containing:
+
+```text
+bind: An attempt was made to access a socket in a way forbidden by its access permissions
+```
+
+Windows is currently excluding the TCP port Supabase is trying to use. This is a machine-level networking condition (commonly tied to Hyper-V/WSL2 dynamic port reservations), not a Fenéla or Supabase defect.
+
+Confirm this with:
+
+```powershell
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+If the port from the error falls inside a listed range, edit the affected port(s) in `supabase/config.toml` locally to a free port outside every listed range (verify with `netstat -ano | findstr "<port>"` first), then re-run `npx supabase@2.113.0 start`. Update `.env.local` and any Mailpit URL you use afterwards to match. Treat such a port change as a local workaround for this machine, not a change to propose upstream, unless the exclusion is reliably reproducible for other contributors too.
+
 ### Fenéla reports missing Supabase configuration
 
 Confirm that `.env.local` contains:
@@ -378,11 +396,7 @@ Restart `npm run dev` after changing `.env.local`.
 
 Confirm that the local Supabase stack is running.
 
-Open Mailpit at:
-
-```text
-http://127.0.0.1:54324
-```
+Open Mailpit at the `MAILPIT_URL` shown by `npx supabase@2.113.0 status`.
 
 Request a new Magic Link from:
 

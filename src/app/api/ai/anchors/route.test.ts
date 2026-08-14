@@ -136,6 +136,63 @@ describe("POST /api/ai/anchors", () => {
     }
   });
 
+  it("rate-limit key is keyed by the authenticated user.id, not the client-supplied deviceId", async () => {
+    const originalKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-key";
+    requireUser.mockResolvedValue({ id: "user-a" });
+
+    try {
+      const first = makeRequest(validBody({ mode: "SUGGEST_ANCHORS", deviceId: "device-1" }));
+      await POST(first as Parameters<typeof POST>[0]);
+
+      const second = makeRequest(validBody({ mode: "SUGGEST_ANCHORS", deviceId: "device-2" }));
+      await POST(second as Parameters<typeof POST>[0]);
+
+      expect(checkRateLimit).toHaveBeenCalledTimes(2);
+      const firstKey = checkRateLimit.mock.calls[0][0].key;
+      const secondKey = checkRateLimit.mock.calls[1][0].key;
+
+      expect(firstKey).toBe("rate:ai-anchors:user-a");
+      expect(secondKey).toBe("rate:ai-anchors:user-a");
+      expect(firstKey).toBe(secondKey);
+    } finally {
+      if (originalKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalKey;
+      }
+    }
+  });
+
+  it("rate-limit key differs between different authenticated users, even with the same deviceId", async () => {
+    const originalKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-key";
+
+    try {
+      requireUser.mockResolvedValue({ id: "user-a" });
+      const first = makeRequest(validBody({ mode: "SUGGEST_ANCHORS", deviceId: "shared-device" }));
+      await POST(first as Parameters<typeof POST>[0]);
+
+      requireUser.mockResolvedValue({ id: "user-b" });
+      const second = makeRequest(validBody({ mode: "SUGGEST_ANCHORS", deviceId: "shared-device" }));
+      await POST(second as Parameters<typeof POST>[0]);
+
+      expect(checkRateLimit).toHaveBeenCalledTimes(2);
+      const firstKey = checkRateLimit.mock.calls[0][0].key;
+      const secondKey = checkRateLimit.mock.calls[1][0].key;
+
+      expect(firstKey).toBe("rate:ai-anchors:user-a");
+      expect(secondKey).toBe("rate:ai-anchors:user-b");
+      expect(firstKey).not.toBe(secondKey);
+    } finally {
+      if (originalKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalKey;
+      }
+    }
+  });
+
   it("rejects invalid intake input", async () => {
     const request = makeRequest(
       validBody({

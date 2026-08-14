@@ -22,7 +22,7 @@ When someone already feels overwhelmed, a larger planning system can add more de
 
 The user chooses one goal, explains what is making it difficult and decides whether they want help choosing small actions. Fenéla can suggest anchors with AI, or the user can create their own.
 
-During the day, Fenéla presents one anchor at a time.
+During the day, Fenéla presents one anchor at a time. The user does the small action first, then returns to Fenéla and marks it as completed.
 
 This repository represents the completed MVP2 release of Fenéla.
 
@@ -64,7 +64,7 @@ Fenéla allows a user to:
 - set a small number of personal preferences;
 - choose one goal;
 - describe what is making that goal difficult and why it matters;
-- create their own anchors or use optional AI assistance;
+- create their own anchors or use optional AI assistance, and change that preference later from Account;
 - receive three small AI-assisted anchor suggestions;
 - edit, regenerate, remove or replace those suggestions;
 - keep up to five anchors for a goal;
@@ -219,7 +219,7 @@ The repository includes:
 - deterministic retention logic;
 - controlled failure behavior for account deletion, reminders and reflections.
 
-The current automated test suite contains **479 passing tests across 67 test files**.
+The current automated test suite contains **529 passing tests across 73 test files**.
 
 GitHub Actions runs formatting, linting, tests and the production build on pushes and pull requests.
 
@@ -274,14 +274,15 @@ When a new Upstash or Vercel KV database is connected through an integration, ge
 
 For a technical review, the suggested reading order is:
 
-1. [Architecture overview](architecture/architecture-overview.md) — system boundaries, responsibilities and data flow.
-2. [MVP scope](docs/product/mvp-scope.md) — current product scope and deliberate exclusions.
-3. [AI and ethical-use guardrails](docs/product/ai-guardrails.md) — AI boundaries, safety decisions and user control.
-4. [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md) — stored data, ownership, deletion and retention.
-5. [Privacy notice](docs/product/privacy-notice.md) — deployment-facing privacy information and operator responsibilities.
-6. [Known limitations](docs/product/known-limitations.md) — current technical and product limitations.
-7. [Maintenance notes](docs/technical/maintenance-notes.md) — recurring operational and maintenance details.
-8. [Local setup](docs/technical/local-setup.md) — configuration and local validation.
+1. [Using Fenéla](docs/product/using-fenela.md) — the core accountability flow, AI preferences, reminders and mobile use.
+2. [Architecture overview](architecture/architecture-overview.md) — system boundaries, responsibilities and data flow.
+3. [MVP scope](docs/product/mvp-scope.md) — current product scope and deliberate exclusions.
+4. [AI and ethical-use guardrails](docs/product/ai-guardrails.md) — AI boundaries, safety decisions and user control.
+5. [Privacy and data lifecycle](docs/product/privacy-data-lifecycle.md) — stored data, ownership, deletion and retention.
+6. [Privacy notice](docs/product/privacy-notice.md) — deployment-facing privacy information and operator responsibilities.
+7. [Known limitations](docs/product/known-limitations.md) — current technical and product limitations.
+8. [Maintenance notes](docs/technical/maintenance-notes.md) — recurring operational and maintenance details.
+9. [Local setup](docs/technical/local-setup.md) — configuration and local validation.
 
 ## Author
 

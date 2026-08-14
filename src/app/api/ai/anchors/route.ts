@@ -17,7 +17,11 @@ import {
 } from "@/lib/aiAnchors";
 import { validateSafeAnchorList, validateSafeUserText } from "@/lib/safety";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
+import {
+  requireUser,
+  UnauthenticatedError,
+  type AuthenticatedUser,
+} from "@/server/auth/requireUser";
 
 export const runtime = "nodejs";
 
@@ -209,8 +213,10 @@ export async function POST(req: NextRequest) {
   // (a verification/infrastructure failure) must not be treated the same
   // as anonymous, so it fails closed instead of falling through to
   // generation.
+  let user: AuthenticatedUser;
+
   try {
-    await requireUser();
+    user = await requireUser();
   } catch (error) {
     if (error instanceof UnauthenticatedError) {
       return jsonError("Your session expired. Please sign in again.", "UNAUTHENTICATED", 401);
@@ -240,10 +246,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Only the OpenAI-cost path is rate-limited; the deterministic path above
-  // (count === 0) never reaches here. Missing deviceId falls into a shared
-  // "unknown" bucket rather than bypassing the limit entirely.
+  // (count === 0) never reaches here. Keyed by the authenticated user, not
+  // the client-supplied deviceId: deviceId costs nothing to rotate and
+  // would let one account mint unlimited fresh buckets.
   const allowed = await checkRateLimit({
-    key: `rate:ai-anchors:${body.deviceId ?? "unknown"}`,
+    key: `rate:ai-anchors:${user.id}`,
     limit: 5,
     windowSeconds: 60 * 60,
   });

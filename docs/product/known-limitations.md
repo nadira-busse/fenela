@@ -28,7 +28,11 @@ Reminder delivery is best effort.
 
 Timing can vary because delivery depends on the cron trigger, deployment availability and the receiving device.
 
-On iPhone and iPad, Web Push should be tested through a Home Screen installation rather than only in a regular Safari tab.
+On iPhone and iPad, Web Push requires Fenéla to run as a Home Screen web app rather than only in a regular browser tab.
+
+On Android, notification behavior depends on the browser and device configuration.
+
+User-facing setup steps and the meaning of reminder states such as `Blocked` and `Not supported` are documented in [Using Fenéla](using-fenela.md).
 
 ## Reminder settings
 

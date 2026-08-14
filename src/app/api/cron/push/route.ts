@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getKvClient } from "@/lib/kv";
+import { WebPushError } from "web-push";
 import type { PushSubscription } from "web-push";
 
 import {
@@ -23,7 +24,19 @@ export const runtime = "nodejs";
 const SUB_KEY = (deviceId: string) => `push:sub:${deviceId}`;
 const DAILY_START_POINTER_KEY = (deviceId: string) => `push:dailyStart:jobId:${deviceId}`;
 
+// Provider diagnostics (Phase 4I): web-push's WebPushError already carries
+// the real HTTP statusCode from the push service — classifyPushError uses
+// it, but until now nothing surfaced it outside that decision, so every
+// non-terminal failure was indistinguishable from the outside beyond the
+// generic "Received unexpected response code" message. Prefixing it here
+// costs nothing and makes pushErrors actually diagnostic (was this a 429?
+// a 500? a 401 that suggests a VAPID config problem?) without changing
+// classification behavior at all.
 function getErrorMessage(err: unknown): string {
+  if (err instanceof WebPushError) {
+    return `HTTP ${err.statusCode}: ${err.message}`;
+  }
+
   if (typeof err === "string") return err;
 
   if (err instanceof Error) {
@@ -143,6 +156,7 @@ export async function GET(req: NextRequest) {
     let transientFailures = 0;
     let cleanedTerminalJob = 0;
     let cleanedTerminalDevice = 0;
+    let taskReminderRetryScheduled = 0;
     const pushErrors: string[] = [];
     const dbCleanupErrors: string[] = [];
 
@@ -162,6 +176,7 @@ export async function GET(req: NextRequest) {
         transientFailures,
         cleanedTerminalJob,
         cleanedTerminalDevice,
+        taskReminderRetryScheduled,
         pushErrors,
         dbCleanupErrors,
       };
@@ -249,23 +264,32 @@ export async function GET(req: NextRequest) {
           // PushSubscription row are all preserved (Phase 4D hardening §4).
           transientFailures++;
 
-          await removeJobForDevice(deviceId, id);
-
           if (job.kind === "DAILY_START") {
             // A transient delivery failure must not permanently disable
             // the user's recurring daily reminder (§5/§9) — the next
             // normal occurrence is scheduled exactly as it would be after
             // a successful delivery.
+            await removeJobForDevice(deviceId, id);
             await rescheduleDailyStartJob(job, deviceId, now);
             dailyRescheduled++;
+          } else if (job.kind === "TASK_REMINDER" && job.attempts < 1) {
+            // One bounded retry for a one-shot reminder (Phase 4I): a
+            // single transient provider hiccup (429/5xx/network) must not
+            // silently drop a reminder the user is about to see on the
+            // very next cron pass a few minutes later. Left due (dueAt
+            // unchanged — it is already <= now) and NOT removed, so the
+            // next cron run picks it straight back up. This still stays
+            // fire-once-with-one-retry best-effort, not an unbounded
+            // retry queue: a second transient failure (attempts already
+            // 1, handled by the branch below) drops it exactly as before.
+            await storeJobForDevice(deviceId, { ...job, attempts: job.attempts + 1 });
+            taskReminderRetryScheduled++;
+          } else {
+            // Either a TASK_REMINDER that already used its one retry, or
+            // any other job kind: smallest existing best-effort behavior
+            // — drop it rather than retry indefinitely.
+            await removeJobForDevice(deviceId, id);
           }
-          // TASK_REMINDER: smallest existing best-effort behavior — a
-          // missed one-shot, time-sensitive check-in nudge is simply
-          // dropped rather than retried (§5). Unlike DAILY_START this is
-          // not a recurring schedule, so there is no "next occurrence" to
-          // preserve, and building bounded-retry machinery around
-          // Job.attempts for an optional, already-best-effort nudge would
-          // be a new retry subsystem this phase does not call for.
 
           continue;
         }
@@ -287,6 +311,7 @@ export async function GET(req: NextRequest) {
       transientFailures,
       cleanedTerminalJob,
       cleanedTerminalDevice,
+      taskReminderRetryScheduled,
       pushErrors: pushErrors.slice(0, 5),
       dbCleanupErrors: dbCleanupErrors.slice(0, 5),
     };

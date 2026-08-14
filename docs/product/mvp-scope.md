@@ -78,14 +78,19 @@ When AI assistance is enabled, Fenéla:
 
 The user reviews the suggestions before saving the anchor set. The manual route remains available without an AI model call.
 
+The AI-assistance preference remains available after onboarding and can be changed from Account.
+
 ### 5. Gentle accountability
 
 For the active anchor, the user can:
 
 - start the action;
-- mark it as completed;
+- perform the action outside the app;
+- return to Fenéla and mark it as completed;
 - postpone it;
 - return to it later.
+
+`Done` means the user has actually completed the small action. Fenéla is not designed to be clicked through like a checklist: the accountability loop depends on the user doing the action first and recording what happened afterwards.
 
 After the second postponement, Fenéla asks what could make the anchor easier to finish. Non-empty user-entered friction is persisted as factual `FrictionEvent` history for authenticated users. It is stored without sentiment analysis, diagnosis or psychological classification.
 

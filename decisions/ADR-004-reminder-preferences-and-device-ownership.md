@@ -13,27 +13,43 @@ Fenéla MVP1 used a locally generated device ID to connect:
 - reminder cancellation;
 - daily reminder state.
 
-That worked as a lightweight device-correlation mechanism.
+That was enough for the first version of the reminder flow.
 
-It was not a reliable authorization boundary because the device ID came from the client.
+At that stage, the device ID only needed to answer a practical question:
 
-The earlier implementation also represented daily reminder settings in more than one place.
+> which browser installation should this reminder state belong to?
 
-Screening stored a reminder choice and start time, while the coaching settings flow could later maintain the same concept through separate local values.
+For lightweight device correlation, that worked.
 
-Those representations could diverge even though they described one user preference.
+The problem became clearer as reminders moved from a local MVP feature into authenticated, persistent product behavior.
 
-The underlying design also mixed three different concepts:
+A client-generated device ID can identify one browser installation, but the client also controls that value. It therefore cannot prove which authenticated user owns the device or authorize changes to account-owned reminder state.
 
-- whether the user wants reminders;
-- which device belongs to that user;
-- which technical push endpoint can receive a notification.
+During the MVP2 work, a second problem became visible.
 
-These responsibilities needed separate ownership boundaries.
+The same reminder preference was represented in more than one place.
+
+Screening could store whether the user wanted reminders and a start time, while the later coaching/settings flow could maintain the same concept through separate local state.
+
+Those values could diverge even though they were supposed to describe one decision made by one user.
+
+This showed that the reminder implementation was mixing three different questions:
+
+```text
+Does the user want reminders?
+
+Which browser or device belongs to that user?
+
+Where can a push notification technically be delivered?
+```
+
+Those questions are related, but they do not have the same owner or lifecycle.
+
+Treating them as one piece of reminder state made the boundaries harder to reason about and created room for stale or conflicting state.
 
 ## Decision
 
-Fenéla separates reminder preference from delivery infrastructure.
+Fenéla separates reminder preference from device ownership and push-delivery infrastructure.
 
 The domain model is:
 
@@ -44,9 +60,9 @@ User
     └── PushSubscription
 ```
 
-## ReminderPreference
+### ReminderPreference
 
-ReminderPreference represents the user's product-level choice.
+`ReminderPreference` represents the user's product-level choice.
 
 It stores the canonical reminder configuration, including:
 
@@ -55,93 +71,132 @@ It stores the canonical reminder configuration, including:
 
 The user's timezone is stored as part of the user preference context used for local-calendar interpretation.
 
-The onboarding reminder choice and later reminder settings update the same canonical preference rather than maintaining independent representations.
+The reminder choice made during onboarding and changes made later in Reminder settings update the same canonical preference.
 
-## Device
+Fenéla does not maintain a second independent reminder preference for the same authenticated user.
+
+### Device
 
 `Device` represents a browser or device installation associated with an authenticated user.
 
-A device identifier is useful for operational correlation.
+A device identifier remains useful for operational correlation.
 
-It is not user identity and is not treated as an authorization credential.
+It can be used to connect device-specific push and scheduling state to the correct browser installation.
 
-## PushSubscription
+It is not user identity and is never treated as an authorization credential.
+
+Authenticated device operations derive the user from the current server session and verify that the device belongs to that user.
+
+### PushSubscription
 
 `PushSubscription` represents the technical Web Push endpoint associated with a verified Device.
 
-A push subscription describes delivery capability.
+It answers a delivery question:
 
-It does not describe whether the user currently wants a daily reminder.
+> where can this device currently receive a push notification?
 
-Authenticated reminder operations derive ownership from the current server session and verified Device association.
+It does not answer the product question:
 
-Rate limiting remains separate from authentication and authorization. It protects routes that can create operational storage growth or external cost.
+> does the user currently want reminders?
+
+A valid push subscription can exist independently of the user's current reminder preference, and a reminder preference can exist even when push delivery is unavailable or blocked.
+
+Authenticated reminder operations therefore derive ownership from the current server session and verified Device association.
+
+Rate limiting remains separate from authentication and authorization.
+
+It protects routes that can create operational storage growth or external cost, but it does not establish identity or ownership.
 
 ## Reason
 
-The earlier model combined three responsibilities:
+The important change was separating concepts that had previously been convenient to treat as one thing.
 
-```text
-- user preference
-- device ownership
-- push delivery
-```
+During implementation and testing, that distinction became necessary because each part of the reminder flow has a different responsibility.
 
-Separating them makes each boundary explicit.
-
-The resulting model answers three different questions:
+The resulting model answers three explicit questions:
 
 ```text
 What does the user want?
 → ReminderPreference
 
-Which device belongs to the user?
+Which device belongs to the authenticated user?
 → Device
 
-Where can a notification be delivered?
+Where can that device currently receive a notification?
 → PushSubscription
 ```
 
-The design also removes duplicated reminder-time state for authenticated users.
+That separation removes ambiguity from both persistence and authorization.
 
-Product preference can therefore change without treating a push endpoint as the preference itself.
+The user can change a reminder preference without treating a technical push endpoint as the preference itself.
+
+A push subscription can expire without implying that the user's reminder preference should be deleted.
+
+A device ID can still be used for device-specific operations without being trusted as proof of account ownership.
+
+The model also removes duplicated reminder-time state for authenticated users.
+
+Onboarding and later reminder settings now refer to the same canonical preference rather than maintaining separate versions of the same product decision.
+
+This became especially important during acceptance testing, where stale client state could otherwise make the UI show a reminder status that no longer matched the persisted preference.
+
+The ownership and state boundaries are therefore explicit by design rather than inferred from whichever browser value happens to be available.
 
 ## Trade-off
 
-The reminder system has more explicit structure than the original device-only model.
+The reminder system now has more explicit structure than the original device-only MVP1 model.
 
-That additional structure is accepted because it resolves existing ambiguity around ownership and duplicated state.
+It requires separate handling for:
+
+- product preference;
+- authenticated device ownership;
+- push-subscription lifecycle;
+- operational scheduling state.
+
+That additional structure is accepted because it resolves problems that already existed:
+
+- duplicated reminder state;
+- unclear ownership;
+- stale client representations;
+- device identifiers being too easy to mistake for credentials;
+- push delivery state being confused with user intent.
 
 Operational delivery remains device-specific.
 
-Fenéla does not introduce a broader multi-device notification system unless a concrete product requirement justifies that additional complexity.
+Fenéla does not introduce a broader multi-device notification platform unless a concrete product requirement justifies that additional complexity.
 
 Push delivery also remains dependent on:
 
 - browser support;
+- operating-system behavior;
 - notification permission;
 - service worker behavior;
 - device behavior;
-- operational configuration.
+- push-provider availability;
+- operational scheduling and deployment configuration.
 
-Reminder delivery therefore cannot be treated as guaranteed.
+Reminder delivery is therefore best effort rather than guaranteed.
+
+That limitation is accepted because reminders support the accountability loop but are not required for Fenéla to remain usable.
 
 ## Impact
 
 Fenéla now:
 
-- persists one canonical ReminderPreference for an authenticated user;
+- persists one canonical `ReminderPreference` for an authenticated user;
+- uses the same reminder preference from onboarding and later Reminder settings;
 - associates Devices with authenticated users;
 - associates PushSubscriptions with owned Devices;
 - does not use a device ID as pseudo-authorization;
 - derives authenticated ownership server-side;
-- uses the same reminder preference from onboarding and later settings;
-- allows the user to enable, disable and reschedule reminders;
+- verifies device ownership before account-owned device operations;
+- allows the user to enable, disable and reschedule reminders without creating a second preference source;
+- keeps notification permission and delivery capability separate from reminder intent;
 - keeps reminder failures from blocking the core accountability flow;
-- separates canonical PostgreSQL ownership from KV-backed operational scheduling.
+- separates canonical PostgreSQL ownership from KV-backed operational scheduling and delivery state.
 
 Timezone handling is explicit in the persisted user context and reminder scheduling flow.
 
 Absolute timestamps remain separate from local calendar interpretation.
 
-The reminder architecture supports the current product without requiring speculative multi-device behavior.
+The reminder architecture supports the current product without requiring speculative multi-device behavior or treating operational push state as account identity.

@@ -23,9 +23,17 @@ The push cron therefore:
 
 Transient delivery failures such as network errors, `429` responses or `5xx` responses do not delete the subscription or Device row.
 
+For a one-shot `TASK_REMINDER`, Fenéla keeps the job for one additional cron attempt after the first transient delivery failure. If the second attempt also fails transiently, the reminder is dropped. This bounded retry keeps reminder delivery best effort without introducing a general retry queue or backoff system.
+
+`DAILY_START` reminders keep their existing behavior: after a transient delivery failure, the failed occurrence is removed and the next daily occurrence is scheduled.
+
 ## Account retention batch bound
 
 `/api/cron/retention` applies Fenéla's inactivity-retention policy.
+
+The hosted Fenéla deployment invokes this route once per day through an external scheduler. Self-hosted deployments must configure their own scheduled invocation and protect it with the configured `CRON_SECRET`.
+
+The scheduler provider is deployment infrastructure rather than part of Fenéla's repository architecture.
 
 The batch scans Supabase Auth users page by page within a single invocation. The scan is bounded by `RETENTION_SCAN_MAX_PAGES` in:
 
@@ -116,7 +124,9 @@ Use it only when development, repeated browser resets or reminder testing have l
 
 ### `cleanup-all-devices.mjs`
 
-This destructive maintenance script clears the reminder system's KV-managed operational state, including:
+This destructive development/test maintenance script clears the reminder system's KV-managed operational state. It is useful after repeated browser, device or reminder testing has created operational state that should be reset before another controlled test cycle.
+
+It removes:
 
 - KV device-set entries;
 - KV push-subscription payloads;
@@ -126,9 +136,21 @@ This destructive maintenance script clears the reminder system's KV-managed oper
 
 It does not remove canonical PostgreSQL Device rows or ReminderPreference rows.
 
-The script requires explicit confirmation before deleting data.
+The script operates against the KV store configured through the active local environment. That store may be remote or shared, so the script must not assume that a locally executed command targets disposable local data.
 
-Storage credentials are read from the local environment and are never stored in the repository.
+Before deletion, the script displays the target KV hostname and affected operational-state counts. A remote or shared store requires an additional explicit opt-in through `--allow-shared-store` or `ALLOW_SHARED_KV_CLEANUP=true`.
+
+Deletion then requires the exact confirmation phrase:
+
+```text
+DELETE ALL DEVICES
+```
+
+Any other confirmation cancels the operation.
+
+For manual maintenance, prefer the command-line --allow-shared-store override so destructive permission is explicit for that individual execution rather than remaining enabled in the environment.
+
+Storage credentials are read from the local environment. Tokens are not printed and are never stored in the repository.
 
 ## Dependency and cross-platform checks
 

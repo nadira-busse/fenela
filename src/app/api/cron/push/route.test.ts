@@ -174,7 +174,7 @@ describe("GET /api/cron/push", () => {
     expect(deletePushSubscriptionByDeviceId).not.toHaveBeenCalled();
   });
 
-  it("non-terminal failure (network/unknown error): preserves the subscription and does not reschedule for a one-shot TASK_REMINDER", async () => {
+  it("non-terminal failure (network/unknown error), first attempt: preserves the subscription and keeps a one-shot TASK_REMINDER for exactly one retry", async () => {
     getDueJobIdsForDevice.mockResolvedValue(["due-job-2"]);
     getJobForDevice.mockResolvedValue(TASK_REMINDER_JOB);
     sendPush.mockRejectedValue(new Error("fetch failed"));
@@ -185,9 +185,55 @@ describe("GET /api/cron/push", () => {
     expect(data.transientFailures).toBe(1);
     expect(kvDel).not.toHaveBeenCalledWith("push:sub:device-1");
     expect(deletePushSubscriptionByDeviceId).not.toHaveBeenCalled();
-    // TASK_REMINDER is one-shot best-effort — no reschedule/retry.
+    // Bounded single retry (Phase 4I): the job is re-stored with attempts
+    // incremented, not dropped, so the next cron pass picks it back up.
+    expect(storeJobForDevice).toHaveBeenCalledWith(
+      "device-1",
+      expect.objectContaining({ id: "due-job-2", attempts: 1 })
+    );
+    expect(data.taskReminderRetryScheduled).toBe(1);
+    // Not removed on this first transient failure.
+    expect(removeJobForDevice).not.toHaveBeenCalledWith("device-1", "due-job-2");
+  });
+
+  it("non-terminal failure, second attempt (attempts already 1): drops the TASK_REMINDER instead of retrying again", async () => {
+    getDueJobIdsForDevice.mockResolvedValue(["due-job-2"]);
+    getJobForDevice.mockResolvedValue({ ...TASK_REMINDER_JOB, attempts: 1 });
+    sendPush.mockRejectedValue(new Error("fetch failed"));
+
+    const response = await GET(makeCronRequest() as unknown as Parameters<typeof GET>[0]);
+    const data = await response.json();
+
+    expect(data.transientFailures).toBe(1);
+    expect(data.taskReminderRetryScheduled).toBe(0);
+    // No further retry — dropped exactly like the previous no-retry behavior.
     expect(storeJobForDevice).not.toHaveBeenCalled();
-    // The due job is still removed so it isn't retried indefinitely.
     expect(removeJobForDevice).toHaveBeenCalledWith("device-1", "due-job-2");
+  });
+
+  it("includes the provider's real HTTP status in pushErrors instead of only the generic message", async () => {
+    getDueJobIdsForDevice.mockResolvedValue(["due-job-2"]);
+    getJobForDevice.mockResolvedValue(TASK_REMINDER_JOB);
+    sendPush.mockRejectedValue(
+      new WebPushError("Received unexpected response code", 500, {} as never, "", "https://x")
+    );
+
+    const response = await GET(makeCronRequest() as unknown as Parameters<typeof GET>[0]);
+    const data = await response.json();
+
+    expect(data.pushErrors[0]).toContain("HTTP 500");
+  });
+
+  it("success: removes the job and does not touch attempts/retry bookkeeping", async () => {
+    getDueJobIdsForDevice.mockResolvedValue(["due-job-2"]);
+    getJobForDevice.mockResolvedValue(TASK_REMINDER_JOB);
+    sendPush.mockResolvedValue(undefined);
+
+    const response = await GET(makeCronRequest() as unknown as Parameters<typeof GET>[0]);
+    const data = await response.json();
+
+    expect(data.processed).toBe(1);
+    expect(removeJobForDevice).toHaveBeenCalledWith("device-1", "due-job-2");
+    expect(storeJobForDevice).not.toHaveBeenCalled();
   });
 });
