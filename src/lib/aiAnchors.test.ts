@@ -147,7 +147,7 @@ describe("fallback builders", () => {
   });
 });
 
-describe("prompt payload boundary (Phase 4H hardening)", () => {
+describe("prompt payload boundary", () => {
   it("buildPrompt does not send the user's display name to the model", () => {
     const prompt = buildPrompt(baseRequest, 3);
 

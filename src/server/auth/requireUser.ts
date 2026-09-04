@@ -27,7 +27,7 @@ export class UnauthenticatedError extends Error {
 // Thrown when supabase.auth.getUser() cannot establish identity for a
 // reason other than "there genuinely is no session" — an expired, invalid
 // or tampered token, or the Auth service itself failing (network error,
-// 5xx) (Phase 4D hardening §3). This is deliberately a *different* type
+// 5xx). This is deliberately a different type
 // from UnauthenticatedError: getOptionalUser() treats UnauthenticatedError
 // as a safe signal that the caller may fall back to unauthenticated/legacy
 // behavior, and that substitution must never happen for a real
@@ -48,6 +48,21 @@ export async function requireUser(): Promise<AuthenticatedUser> {
     // The typed/code-based distinction Supabase Auth itself provides for
     // "there is no session to check" — not a string-matched guess.
     if (isAuthSessionMissingError(error)) {
+      throw new UnauthenticatedError();
+    }
+
+    // The session's own JWT is syntactically/cryptographically valid but its
+    // subject no longer exists — e.g. this account was deleted (user-
+    // initiated deletion, or 12-month inactivity retention) while a
+    // still-cached, not-yet-expired session remained in the browser.
+    // Confirmed against real Supabase Auth (not inferred): getUser() returns
+    // AuthApiError { status: 403, code: "user_not_found" } for exactly this
+    // case, and isAuthSessionMissingError() does not recognize it as a
+    // missing-session error. This identity is gone just as surely as a
+    // missing session and must never keep being treated as live — but it is
+    // not an Auth-service/infrastructure failure, so it must not become
+    // AuthVerificationError either.
+    if (error.code === "user_not_found") {
       throw new UnauthenticatedError();
     }
 

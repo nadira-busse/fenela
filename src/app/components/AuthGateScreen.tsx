@@ -1,7 +1,7 @@
 // Shown to an unauthenticated visitor who is about to start screening for
-// the first time (Phase 4A). Gives brief orientation before asking for
+// the first time. Gives brief orientation before asking for
 // authentication — screening now persists to an authenticated account, so
-// it must not start before identity is established (AGENTS.md §8).
+// it must not start before identity is established.
 //
 // Not a new onboarding wizard: same product explanation ScreeningScreen
 // already showed, just placed before account creation instead of after.

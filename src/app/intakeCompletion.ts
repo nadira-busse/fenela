@@ -1,4 +1,4 @@
-// Orchestrates Intake completion (Phase 4B hardening, Defect C): for an
+// Orchestrates Intake completion: for an
 // authenticated user, the DB Goal+Anchor transaction must succeed before
 // any local compatibility state (fenela:intake, careAnchors, dayStateV3)
 // is written — otherwise a failed persistence attempt could leave
@@ -7,7 +7,7 @@
 // testable without rendering the component (this repo has no RTL/jsdom
 // dependency), mirroring src/app/newGoalReset.ts's approach.
 //
-// The unauthenticated/local-only MVP1 path has no DB step to wait on, so
+// The unauthenticated local-only path has no DB step to wait on, so
 // it applies compatibility state immediately using the anchors as
 // submitted — unchanged from the existing local-only behavior.
 
@@ -37,7 +37,7 @@ export type IntakeCompletionDeps = {
 };
 
 // The DB-persisted Anchors (normalized id/source, position from the RPC)
-// are canonical once a Goal is created (Phase 4B §10) — reused here
+// are canonical once a Goal is created and are reused here
 // instead of the client-submitted anchors so the compatibility cache
 // matches exactly what was persisted, without re-reading localStorage or
 // re-querying the database.
@@ -85,7 +85,7 @@ export async function performIntakeCompletion(
 
   // Only reached once persistence has succeeded (or there was no
   // authenticated user to persist for, i.e. the unauthenticated/local-only
-  // MVP1 path) — compatibility state is never applied before that.
+  // local-only path); compatibility state is never applied before that.
   deps.applyCompletedIntake({
     goalId,
     intake: {

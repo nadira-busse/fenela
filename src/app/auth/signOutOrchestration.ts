@@ -1,4 +1,4 @@
-// The actual sign-out step sequence (Phase 4D final hardening §7/§8/§9),
+// The sign-out step sequence,
 // extracted from src/app/auth/SignOutButton.tsx so the "cleanup failure
 // must never trap a user inside an authenticated session" guarantee is
 // unit-testable without rendering a component (this repo has no RTL/jsdom
@@ -6,7 +6,7 @@
 // final signOut() call is deliberately best-effort: a thrown/rejected
 // cleanup step is caught, logged, and never stops the sequence.
 //
-// Order matters (§8): server device cleanup must run while the session
+// Order matters: server device cleanup must run while the session
 // still exists, browser unsubscribe next, local cleanup next, and the
 // actual Supabase signOut() last and unconditionally.
 

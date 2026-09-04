@@ -61,13 +61,24 @@ function resolveDeviceId(value: unknown): string | null {
   return null;
 }
 
+// Order matters for recoverability, for the same reason as
+// src/lib/jobs.ts's storeJobForDevice reordering): sadd first, then set. If
+// set fails after sadd already succeeded, the device is in the discovery
+// index with no subscription key yet — already a normal, harmless shape
+// cron's own drain loop already handles (`if (!subscription?.endpoint) {
+// skippedNoSub++; continue; }`). The reverse order (set first) risks the
+// opposite shape if sadd then fails: a subscription key that exists but
+// whose device is not in DEVICES_SET_KEY at all — invisible to cron's
+// smembers-based device enumeration, and to nothing else that would
+// otherwise re-add it, until some unrelated later request for the same
+// device happens to call sadd again.
 async function writeKvSubscription(
   kv: NonNullable<ReturnType<typeof getOptionalKvClient>>,
   deviceId: string,
   sub: PushSubscriptionJSON
 ) {
-  await kv.set(subKeyForDevice(deviceId), sub);
   await kv.sadd(DEVICES_SET_KEY, deviceId);
+  await kv.set(subKeyForDevice(deviceId), sub);
 }
 
 export async function POST(req: Request) {

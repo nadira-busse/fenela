@@ -1,8 +1,8 @@
 "use server";
 
 // Public-facing, client-callable Server Action boundary for deterministic
-// Reflection creation (Phase 4E §16; hardened to close the untrusted
-// period boundary). Accepts ONLY `type` — never a caller-supplied
+// Reflection creation rejects an untrusted caller-supplied period. Accepts
+// ONLY `type`, never a caller-supplied
 // referenceInstant, period, or any other period-selection input. Whatever
 // instant this Server Action runs at ("now") is always what determines
 // the period; that instant is derived here, server-side, and handed to
@@ -21,7 +21,7 @@
 //
 // This intentionally says nothing about WHEN a reflection should be
 // generated or shown — weekly/monthly scheduling and presentation remain
-// an explicit later-phase product decision. It only guarantees that
+// an explicit product decision. It only guarantees that
 // whenever this Server Action runs, the period is always "now," never
 // caller-chosen.
 

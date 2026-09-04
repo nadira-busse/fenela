@@ -1,9 +1,9 @@
 "use server";
 
-// Account-screen mutation boundary for the `anchor_choice_mode` field alone
-// (Phase 4I — AI assistance state consistency). `user_preferences` has no
-// per-field update path: saveUserPreferenceAction() upserts the whole row
-// (AGENTS.md-style least-surprise contract already established there), so
+// Account-screen mutation boundary for the `anchor_choice_mode` field alone.
+// `user_preferences` has no per-field update path:
+// saveUserPreferenceAction() upserts the whole row. To preserve that
+// least-surprise contract,
 // changing just the AI-assistance choice must first read the user's current
 // row and write it back with only anchorChoiceMode replaced — never resets
 // display_name/resistance_pattern/main_challenge/action_trigger/anti_help to

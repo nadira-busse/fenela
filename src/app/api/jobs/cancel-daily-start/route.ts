@@ -61,7 +61,28 @@ export async function POST(req: Request) {
     const jobId = await kv.get<string>(pointerKey);
 
     if (jobId) {
-      await removeJobForDevice(deviceId, jobId).catch(() => {});
+      try {
+        await removeJobForDevice(deviceId, jobId);
+      } catch (error) {
+        // Do not delete the pointer or report success. The pointer still resolving
+        // to this exact jobId is what keeps /api/cron/push's own
+        // pointer-mismatch guard protecting this job until a retry
+        // actually removes it. Deleting the pointer here despite the job
+        // itself surviving would strip that protection while leaving the
+        // job live — turning a still-scheduled, still-cancellable job into
+        // an unprotected orphan. A retry is always safe: kv.get above will
+        // find the same pointer/jobId again next time.
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Could not fully cancel the daily reminder. Please try again.",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     await kv.del(pointerKey);

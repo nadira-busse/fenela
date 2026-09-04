@@ -66,7 +66,7 @@ describe("ensureLocalOwnership", () => {
   });
 
   it("does not adopt old ownerless (pre-auth) local state when no marker exists yet", () => {
-    seedOwnedState(); // old MVP1 state, never touched by an authenticated session
+    seedOwnedState(); // legacy local state, never touched by an authenticated session
 
     ensureLocalOwnership(USER_A);
 

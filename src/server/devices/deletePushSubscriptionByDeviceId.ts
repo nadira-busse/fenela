@@ -1,5 +1,5 @@
-// Privileged, server-only cleanup for a terminal invalid PushSubscription
-// (Phase 4D hardening §6). Called only from src/app/api/cron/push/route.ts,
+// Privileged, server-only cleanup for a terminal invalid PushSubscription.
+// Called only from src/app/api/cron/push/route.ts,
 // which has no authenticated user session and therefore no RLS-scoped
 // client that could perform this delete on the user's behalf. Uses the
 // admin client (SUPABASE_SECRET_KEY, bypasses RLS) instead. This helper is

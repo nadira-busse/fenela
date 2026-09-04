@@ -25,7 +25,7 @@ The problem became clearer as reminders moved from a local MVP feature into auth
 
 A client-generated device ID can identify one browser installation, but the client also controls that value. It therefore cannot prove which authenticated user owns the device or authorize changes to account-owned reminder state.
 
-During the MVP2 work, a second problem became visible.
+A second problem appears when reminder intent and delivery capability are treated as the same state.
 
 The same reminder preference was represented in more than one place.
 

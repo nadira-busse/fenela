@@ -1,12 +1,8 @@
-// Shared system/cron request authorization (Phase 4H). Extracted from
-// src/app/api/cron/push/route.ts's original private helper of the same
-// name/behavior so the retention cron route (src/app/api/cron/retention/
-// route.ts) can require the exact same Bearer-token boundary without a
-// second, potentially-diverging copy of this check. Behavior is
-// unchanged: still requires a non-empty CRON_SECRET server-side, still
-// compares it against the request's `Authorization: Bearer <token>`
-// header, still fails closed (false) whenever the secret is missing or the
-// token does not match exactly.
+// Shared system/cron request authorization used by both push and retention
+// routes so they enforce one Bearer-token boundary. Requires a non-empty
+// server-side CRON_SECRET, compares it with the request's
+// `Authorization: Bearer <token>` header, and fails closed when the secret
+// is missing or the token does not match exactly.
 //
 // This is a server/system boundary, not a user-session boundary — it must
 // never be satisfied by an authenticated user's session (requireUser()),

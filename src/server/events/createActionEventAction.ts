@@ -1,7 +1,7 @@
 "use server";
 
-// Public-facing mutation boundary for appending an immutable ActionEvent
-// (Phase 4C). Treated like any public endpoint: authenticates and
+// Public-facing mutation boundary for appending an immutable ActionEvent.
+// Treated like any public endpoint: authenticates and
 // validates on the server, does not trust a caller-supplied user_id or
 // anchor ownership claim.
 //
@@ -18,8 +18,8 @@
 // recorded.
 //
 // Time: occurred_at/local_date/time_zone are derived server-side from the
-// authenticated user's own canonical user_preferences.time_zone (Phase 4C
-// §6) — never from a caller-supplied timezone.
+// authenticated user's own canonical user_preferences.time_zone, never
+// from a caller-supplied timezone.
 
 import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
 import { createSupabaseServerClient } from "@/lib/supabase/server";

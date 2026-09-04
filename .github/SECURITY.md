@@ -1,6 +1,6 @@
 # Security Policy
 
-Fenéla is a public MIT-licensed portfolio and software project.
+Fenéla is a public MIT-licensed software project.
 
 Security issues should be reported privately where possible so they can be reviewed before public disclosure.
 

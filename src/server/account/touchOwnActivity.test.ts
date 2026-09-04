@@ -50,8 +50,8 @@ describe("touchOwnActivity", () => {
   it("creates the row on a user's first-ever authenticated request (no prior row required)", async () => {
     // The upsert call itself is identical whether or not a row already
     // exists — that is the point of using ON CONFLICT rather than a plain
-    // UPDATE, and is what fixes the original defect where a user with no
-    // user_preferences row was silently never touched.
+    // UPDATE, ensuring a user without an existing user_preferences row is
+    // still recorded.
     await touchOwnActivity("user-brand-new");
 
     expect(upsertMock).toHaveBeenCalledWith(

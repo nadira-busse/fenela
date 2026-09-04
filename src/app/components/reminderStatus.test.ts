@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Proves the intent (enabled) vs capability/permission distinction
 // getInitialReminderStatus already encodes, now that HomeClient/Coaching
-// actually feeds it a live `enabled` value instead of a stale one
-// (Phase 4I). Only getNotificationPermission is mocked — the function under
+// actually feeds it a live `enabled` value instead of a stale one. Only
+// getNotificationPermission is mocked; the function under
 // test is otherwise exercised directly.
 const { getNotificationPermission } = vi.hoisted(() => ({
   getNotificationPermission: vi.fn(),
@@ -42,7 +42,7 @@ describe("getInitialReminderStatus", () => {
     expect(getInitialReminderStatus(true)).toBe("blocked");
   });
 
-  it("reports on only when intent is true AND permission is granted (the reported defect's fix point)", () => {
+  it("reports on only when intent is true AND permission is granted", () => {
     getNotificationPermission.mockReturnValue("granted");
 
     expect(getInitialReminderStatus(true)).toBe("on");

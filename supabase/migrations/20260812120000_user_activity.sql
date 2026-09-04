@@ -1,9 +1,7 @@
--- Fenéla MVP2 — Phase 4H: dedicated server-owned activity lifecycle table
+-- Fenéla dedicated server-owned activity lifecycle table
 -- for the 12-month inactivity retention policy.
 --
--- Why a separate table, not a column on user_preferences (an earlier,
--- uncommitted version of this migration did exactly that, and was
--- replaced before ever being accepted):
+-- Why this is a separate table rather than a user_preferences column:
 --   - user_preferences only exists once a user completes onboarding/
 --     screening. An authenticated user who returns to Fenéla before
 --     completing that flow would otherwise have no server-observed
@@ -29,7 +27,7 @@ create table public.user_activity (
 );
 
 comment on table public.user_activity is
-  'One row per authenticated user: the most recent server-observed authenticated Fenéla product request (Phase 4H). Written only by the privileged root-load activity touch (src/server/account/touchOwnActivity.ts); never client-writable. Used together with auth.users.last_sign_in_at (whichever is more recent) to determine 12-month inactivity retention eligibility. Cascades on auth.users deletion like every other account-owned table.';
+  'One row per authenticated user: the most recent server-observed authenticated Fenéla product request. Written only by the privileged root-load activity touch (src/server/account/touchOwnActivity.ts); never client-writable. Used together with auth.users.last_sign_in_at (whichever is more recent) to determine 12-month inactivity retention eligibility. Cascades on auth.users deletion like every other account-owned table.';
 
 comment on column public.user_activity.last_active_at is
   'Server-observed timestamp of the most recent authenticated Fenéla product request for this user. Not client-writable — see table comment.';
@@ -53,9 +51,7 @@ comment on column public.user_activity.last_active_at is
 -- updates it). No DELETE grant: rows are only ever removed via the
 -- auth.users cascade above, never directly. BYPASSRLS lets service_role
 -- skip Row Level Security policy evaluation; it does not grant standard
--- SQL table privileges, which Postgres still enforces for every role (the
--- same root cause already fixed for push_subscriptions, reflections and
--- devices in earlier migrations).
+-- SQL table privileges, which Postgres still enforces for every role.
 
 alter table public.user_activity enable row level security;
 

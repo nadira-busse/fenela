@@ -1,6 +1,6 @@
 "use server";
 
-// Public-facing mutation boundary for `user_preferences` (Phase 4A). Treated
+// Public-facing mutation boundary for `user_preferences`. Treated
 // like any public endpoint: authenticates and validates on the server, does
 // not trust a caller-supplied user_id. One row per authenticated user —
 // upsert on the user_id primary key so a first save creates it and a later

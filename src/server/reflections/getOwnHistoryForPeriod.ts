@@ -1,5 +1,5 @@
 // Server-side read path for the authenticated user's own ActionEvent +
-// FrictionEvent history within one exact reflection period (Phase 4E §8).
+// FrictionEvent history within one exact reflection period.
 // Server Component/server-boundary use only — not a Server Action, so it
 // is not reachable as a client-callable endpoint. Mirrors
 // src/server/preferences/getOwnUserPreference.ts / getActiveGoal.ts.
@@ -8,8 +8,7 @@
 // `action_events_select_own`/`friction_events_select_own` policies
 // (anchor -> goal -> auth.uid()) are the actual authorization check, with
 // no caller-supplied user_id anywhere. Those policies carry no status
-// filter, so ARCHIVED-Goal history is included automatically (Phase 4C
-// established this; Phase 4E §9 relies on it, not a new filter).
+// filter, so ARCHIVED-Goal history is included automatically.
 //
 // Date filtering uses the stored `local_date` column directly — the
 // column the write boundary already derived specifically to represent

@@ -114,7 +114,7 @@ export default function HomeClient({
   // above). Set the instant screening finishes so Coaching reflects the
   // just-persisted reminder_preferences row immediately, instead of the
   // stale prop captured by the server render that happened before
-  // screening ran (Phase 4I — the "screening Yes -> Home shows Off" defect).
+  // screening ran, preventing Home from showing a stale reminder status.
   const [reminderPreferenceOverride, setReminderPreferenceOverride] = useState<
     PersistedReminderPreference | null | undefined
   >(undefined);
@@ -125,7 +125,7 @@ export default function HomeClient({
   // to the `activeGoal` prop, null = explicitly no goal (just archived),
   // a string = explicitly this goal (just created) — needed because the
   // server-provided `activeGoal` prop cannot reflect a mutation that just
-  // happened in this same client session (Phase 4B hardening, Defect A).
+  // happened in this same client session.
   const [goalIdOverride, setGoalIdOverride] = useState<string | null | undefined>(undefined);
 
   // Keep name across "New Goal".
@@ -134,7 +134,7 @@ export default function HomeClient({
   // Force-remount CoachingScreen when restarting day.
   const [coachMountKey, setCoachMountKey] = useState(0);
 
-  // New Goal archive request state (Phase 4B hardening, Defect B).
+  // New Goal archive request state.
   const [archivingNewGoal, setArchivingNewGoal] = useState(false);
   const [newGoalError, setNewGoalError] = useState<string | null>(null);
 
@@ -170,14 +170,14 @@ export default function HomeClient({
     ? loadFromStorage<Intake | null>(LS_INTAKE_KEY, null)
     : null;
 
-  // Identity and screening completion are separate facts (Phase 4A §5):
+  // Identity and screening completion are separate facts:
   // for an authenticated user, the DB preference (not a possibly-stale
   // local flag) is the base signal — syncAuthenticatedLocalState already
   // refreshed the local cache from it above. screeningDoneOverride still
   // wins once set, e.g. right after a successful screening submit, so the
   // UI advances immediately without waiting on a server refetch of the
   // now-stale `dbPreference` prop. Unauthenticated visitors keep the
-  // existing MVP1 local-only behavior unchanged.
+  // existing unauthenticated local-only behavior unchanged.
   const screeningDone =
     screeningDoneOverride ?? (isAuthenticated ? Boolean(dbPreference) : storedScreeningDone);
 
@@ -201,10 +201,10 @@ export default function HomeClient({
   );
 
   // Goal data complete + final Anchor set chosen is the persistence
-  // boundary (Phase 4B §16) — not shown to the user until this succeeds
-  // (§17): for an authenticated user, the DB write happens first and the
+  // boundary: not shown to the user until this succeeds. For an
+  // authenticated user, the DB write happens first and the
   // local compatibility cache/Coaching transition only proceed on success.
-  // Unauthenticated visitors keep the existing MVP1 local-only behavior.
+  // Unauthenticated visitors keep the existing local-only behavior.
   const handleCompleteIntake = (data: IntakeCompletionData): Promise<IntakeCompletionResult> =>
     performIntakeCompletion(userId, data, {
       createGoalWithAnchors: createGoalWithAnchorsAction,
@@ -237,10 +237,10 @@ export default function HomeClient({
   };
 
   // Archives the current ACTIVE goal in PostgreSQL before clearing local
-  // state (Phase 4B §14) — never deletes it, and never creates a
+  // state. It never deletes the goal or creates a
   // replacement goal (the next completed Intake does that). If the archive
   // fails, local state is deliberately left untouched and a calm error is
-  // shown near the New Goal action (Phase 4B hardening, Defect B) so the
+  // shown near the New Goal action so the
   // user isn't left wondering whether the button did anything. The actual
   // archive-then-clear ordering lives in performNewGoalReset() so it stays
   // testable outside this component.

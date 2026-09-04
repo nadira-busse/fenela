@@ -1,4 +1,4 @@
-// Fenéla's 12-month inactivity retention policy (Phase 4H, hardened).
+// Fenéla's 12-month inactivity retention policy.
 // This is a Fenéla product/data-retention policy — a chosen
 // storage-limitation boundary, not a period the GDPR/AVG itself
 // prescribes for this product. See docs/product/privacy-data-lifecycle.md
@@ -86,8 +86,7 @@ function resolveEffectiveLastActivity(
 // explicitly, so retention eligibility is always reproducible from its
 // inputs alone.
 //
-// Two independent activity sources feed this decision (Phase 4H
-// hardening):
+// Two independent activity sources feed this decision:
 //   - `lastSignInAtIso`: Supabase Auth's own `User.last_sign_in_at` — a
 //     safe baseline that only advances on a new sign-in event;
 //   - `lastActiveAtIso`: `user_preferences.last_active_at` — a
@@ -97,7 +96,7 @@ function resolveEffectiveLastActivity(
 // The effective signal is whichever of the two is more recent — a device
 // timestamp (`devices.last_seen_at`) never participates, because it is
 // only touched by the push/device-subscription path, not by normal
-// authenticated use (Phase 4H hardening).
+// authenticated use.
 //
 // Missing/malformed input on EITHER source alone never suppresses the
 // other (see resolveEffectiveLastActivity). Only when neither source

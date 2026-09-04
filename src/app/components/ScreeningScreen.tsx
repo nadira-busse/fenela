@@ -21,8 +21,7 @@ import {
 
 // Reports the reminder preference that is now actually persisted in
 // `reminder_preferences`, so HomeClient can reflect it immediately instead
-// of waiting for the next full page load (the "screening Yes -> Home shows
-// Off" defect this fixes).
+// of waiting for the next full page load.
 type Props = { onDone: (reminder: ScreeningReminderOutcome) => void };
 
 type PushSubscriptionJSON = {

@@ -1,9 +1,9 @@
--- Fenéla MVP2 — Phase 4B: atomic Goal + Anchor creation
+-- Fenéla atomic Goal + Anchor creation
 --
--- Narrowly scoped to the one problem Phase 4B actually has: a completed
+-- Narrowly scoped to one invariant: a completed
 -- Intake produces a Goal AND its 1-5 selected Anchors together, and a Goal
 -- without its anchors is not a valid completed Intake result (see
--- decisions and Phase 4B task notes). Two separate INSERT statements from
+-- the persistence decisions). Two separate INSERT statements from
 -- application code cannot guarantee that atomically; a single PL/pgSQL
 -- function body can, since PostgreSQL rolls back everything the function
 -- did if any statement inside it raises.

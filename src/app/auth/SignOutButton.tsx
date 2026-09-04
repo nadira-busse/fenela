@@ -25,7 +25,7 @@ async function finalSignOut() {
   try {
     await fetch("/auth/signout", { method: "POST" });
   } finally {
-    // Unconditional navigation (Phase 4D final hardening §9): even if the
+    // Navigation is unconditional: even if the
     // request itself failed (e.g. a network error), the user must not be
     // left stuck on this page — they land on /auth either way and can
     // retry if the session somehow wasn't actually cleared server-side.

@@ -1,40 +1,12 @@
-// Trusted internal implementation for the Phase 4F weekly reflection
-// product flow: resolve the eligible previous completed Monday..Sunday
-// week for the authenticated caller, reusing an existing Reflection row for
-// that exact period if one exists, or deterministically creating exactly
-// one if the week had any recorded activity. NOT a Server Action (no
-// "use server" directive) — the only public, client-callable entry point is
-// resolveWeeklyReflection.ts, which always supplies `referenceInstant`
-// itself (`new Date()`), never anything caller-derived. Same trust-boundary
-// split, and the same reasons for it, as createReflectionForPeriodCore.ts.
+// Trusted internal implementation for the live weekly-reflection flow. It
+// resolves the previous completed Monday-Sunday period for the authenticated
+// caller, reuses an existing immutable reflection for that period, or creates
+// one deterministically when recorded activity exists. Empty completed periods
+// are not persisted or presented. Concurrent creation is reconciled through the
+// database period-uniqueness constraint and a re-read of the existing row.
 //
-// Differs from createReflectionForPeriodCore.ts in exactly two ways:
-//   1. the period is the previous COMPLETED week (getPreviousCompletedWeeklyPeriod),
-//      never the possibly-still-in-progress current week;
-//   2. a completed week with zero ActionEvents and zero FrictionEvents never
-//      gets a Reflection row at all — `reflection: null` is returned instead
-//      of inserting an empty one (Phase 4F "empty-period decision": an empty
-//      week ending is not, by itself, something worth interrupting the user
-//      for). The existing createReflectionForPeriod technical path is
-//      unaffected and can still produce an empty-rendered Reflection if
-//      invoked directly.
-//
-// Everything else — the admin-client INSERT, the 23505 unique-constraint
-// conflict treated as "already exists, re-read and return it", the RLS-
-// scoped reads — mirrors createReflectionForPeriodCore.ts exactly, kept as
-// a separate, self-contained implementation here rather than refactoring
-// that already-accepted Phase 4E file for a new phase's product flow.
-//
-// Presentation-eligibility hardening: "a Reflection exists in persistence"
-// and "a Reflection must be presented" are deliberately different
-// questions. An already-persisted row can itself be empty (e.g. created via
-// the older createReflectionForPeriod technical path before this resolver
-// existed, or as a historical artifact from a week that truly had none) —
-// so an existing row is only ever returned for presentation after the same
-// emptiness check newly derived facts already get below. This never
-// mutates, regenerates, or deletes that row; an empty existing row simply
-// is not surfaced this time (`reflection: null`), exactly as if it did not
-// exist yet. Persistence stays untouched and immutable either way.
+// This module is intentionally separate from the generic period primitive: the
+// live product has previous-completed-week semantics and an empty-period gate.
 
 import { requireUser, UnauthenticatedError } from "@/server/auth/requireUser";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -170,7 +142,7 @@ export async function resolveWeeklyReflectionCore(
 
   // A completed week with no recorded activity at all is not, by itself,
   // meaningful enough to interrupt the user with — and no Reflection row is
-  // created for it (Phase 4F empty-period decision).
+  // created for it.
   if (isFactsEmpty(facts)) {
     return { ok: true, reflection: null };
   }

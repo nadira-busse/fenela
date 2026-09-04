@@ -9,6 +9,7 @@
 import type { AnchorSource, CareAnchor } from "@/types/CareAnchor";
 import type { PersonalAnchorInterpretation } from "@/types/intake";
 import type { StoredCareAnchor } from "@/lib/storage";
+import { validateSafeUserText, validateSafeAnchorText } from "@/lib/safety";
 
 export type InterpretationSource = "AI" | "FALLBACK";
 
@@ -65,12 +66,21 @@ function isPersonalAnchorInterpretationShape(
   );
 }
 
-// Server-boundary validation (AGENTS.md §12): runs regardless of what the
+// Server-boundary validation runs regardless of what the
 // caller's TypeScript types claim, since the Server Action calling this is
-// reachable as a plain POST endpoint. The DB (CHECK constraints + the new
+// reachable as a plain POST endpoint. The DB (CHECK constraints and the
 // create_active_goal_with_anchors RPC) validates again independently —
 // this is the app-level check that produces a fast, controlled failure
 // before ever calling Supabase.
+//
+// Safety validation: the same hasUnsafeIntent-based
+// filter (src/lib/safety.ts) that gates the AI route's own input/output and
+// IntakeScreen's client-side UI is applied here too — this is the ONE
+// mutation boundary every goal/anchor creation path actually goes through
+// (AI-suggested, fallback and manually-typed anchors alike; docs/product/
+// ai-guardrails.md documents this filter as covering "user input and saved
+// anchors"). Server-side enforcement is required because a direct Server
+// Action call can bypass IntakeScreen's client-side check.
 export function validateCreateGoalInput(input: CreateGoalInput): ValidationResult {
   if (!isNonEmptyBounded(input.title, MAX_TEXT_LENGTH)) {
     return { ok: false, message: "Please describe your goal." };
@@ -82,6 +92,14 @@ export function validateCreateGoalInput(input: CreateGoalInput): ValidationResul
 
   if (!isNonEmptyBounded(input.initialStruggle, MAX_TEXT_LENGTH)) {
     return { ok: false, message: "Please describe what's making this hard." };
+  }
+
+  for (const value of [input.title, input.why, input.initialStruggle]) {
+    const safety = validateSafeUserText(value);
+
+    if (!safety.ok) {
+      return { ok: false, message: safety.message };
+    }
   }
 
   if (
@@ -123,6 +141,12 @@ export function validateCreateGoalInput(input: CreateGoalInput): ValidationResul
       return { ok: false, message: "Each anchor needs text." };
     }
 
+    const anchorSafety = validateSafeAnchorText(anchor.text);
+
+    if (!anchorSafety.ok) {
+      return { ok: false, message: anchorSafety.message };
+    }
+
     if (!ANCHOR_SOURCES.includes(anchor.source)) {
       return { ok: false, message: "Invalid anchor source." };
     }
@@ -145,7 +169,7 @@ export function validateCreateGoalInput(input: CreateGoalInput): ValidationResul
   return { ok: true };
 }
 
-// --- DB → application compatibility shape (Phase 4B §10/§12) ---
+// --- DB → application compatibility shape ---
 
 export type ActiveGoalWithAnchors = {
   id: string;
@@ -174,9 +198,9 @@ export function mapDbAnchorSource(value: string): AnchorSource {
   return isAnchorSource(value) ? value : "USER";
 }
 
-// The DB Goal + its ACTIVE Anchors are canonical for an authenticated user
-// (Phase 4B §10) — this reconstructs the temporary local shape existing
-// MVP1 downstream code (IntakeScreen/CoachingScreen via loadScreening()-
+// The DB Goal and its ACTIVE Anchors are canonical for an authenticated
+// user. This reconstructs the temporary shape required by local-only
+// downstream code (IntakeScreen/CoachingScreen via loadScreening()-
 // adjacent storage helpers) still requires, without making localStorage
 // canonical again.
 export function mapActiveGoalToCompatibilityState(

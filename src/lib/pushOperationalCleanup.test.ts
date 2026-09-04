@@ -31,7 +31,7 @@ describe("cleanupOperationalPushState", () => {
 
     const result = await cleanupOperationalPushState("device-a");
 
-    expect(result).toEqual({ cleanedJobs: 2 });
+    expect(result).toEqual({ cleanedJobs: 2, jobCleanupComplete: true });
     expect(removeJobForDevice).toHaveBeenCalledWith("device-a", "job-1");
     expect(removeJobForDevice).toHaveBeenCalledWith("device-a", "job-2");
     expect(kvDel).toHaveBeenCalledWith("push:sub:device-a");
@@ -46,7 +46,7 @@ describe("cleanupOperationalPushState", () => {
       additionalJobIds: ["job-1", "job-2"],
     });
 
-    expect(result).toEqual({ cleanedJobs: 2 });
+    expect(result).toEqual({ cleanedJobs: 2, jobCleanupComplete: true });
     expect(removeJobForDevice).toHaveBeenCalledTimes(2);
   });
 
@@ -56,15 +56,73 @@ describe("cleanupOperationalPushState", () => {
     const first = await cleanupOperationalPushState("device-a");
     const second = await cleanupOperationalPushState("device-a");
 
-    expect(first).toEqual({ cleanedJobs: 0 });
-    expect(second).toEqual({ cleanedJobs: 0 });
+    expect(first).toEqual({ cleanedJobs: 0, jobCleanupComplete: true });
+    expect(second).toEqual({ cleanedJobs: 0, jobCleanupComplete: true });
     expect(kvDel).toHaveBeenCalledWith("push:sub:device-a");
   });
 
-  it("tolerates a failed zrange lookup rather than throwing", async () => {
+  it("tolerates a failed zrange lookup rather than throwing, and reports jobCleanupComplete: false", async () => {
     kvZrange.mockRejectedValue(new Error("kv unavailable"));
 
-    await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({ cleanedJobs: 0 });
+    await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({
+      cleanedJobs: 0,
+      jobCleanupComplete: false,
+    });
+  });
+
+  describe("device-set removal gated on confirmed job cleanup", () => {
+    it("does NOT remove the device from the discovery index when the zset lookup itself failed — every cleanup path (cron's own drain, both maintenance scripts) enumerates devices exclusively through this set, so removing it here would permanently strand any leftover job state", async () => {
+      kvZrange.mockRejectedValue(new Error("kv unavailable"));
+
+      const result = await cleanupOperationalPushState("device-a");
+
+      expect(result.jobCleanupComplete).toBe(false);
+      expect(kvSrem).not.toHaveBeenCalled();
+      // The subscription and pointer are still deleted unconditionally —
+      // deleting a single key creates no discoverability gap the way
+      // removing a device from an enumeration index does.
+      expect(kvDel).toHaveBeenCalledWith("push:sub:device-a");
+      expect(kvDel).toHaveBeenCalledWith("push:dailyStart:jobId:device-a");
+    });
+
+    it("does NOT remove the device from the discovery index when an individual job removal failed", async () => {
+      kvZrange.mockResolvedValue(["job-1", "job-2"]);
+      removeJobForDevice.mockImplementation(async (_deviceId: string, jobId: string) => {
+        if (jobId === "job-2") {
+          throw new Error("job removal failed");
+        }
+      });
+
+      const result = await cleanupOperationalPushState("device-a");
+
+      // job-1 still counted as genuinely cleaned; job-2 was not, so the
+      // pass as a whole is not complete.
+      expect(result).toEqual({ cleanedJobs: 1, jobCleanupComplete: false });
+      expect(kvSrem).not.toHaveBeenCalled();
+    });
+
+    it("DOES remove the device from the discovery index once every job removal is confirmed to have succeeded", async () => {
+      kvZrange.mockResolvedValue(["job-1", "job-2"]);
+
+      const result = await cleanupOperationalPushState("device-a");
+
+      expect(result).toEqual({ cleanedJobs: 2, jobCleanupComplete: true });
+      expect(kvSrem).toHaveBeenCalledWith("push:devices:set", "device-a");
+    });
+
+    it("retry: a later call with KV recovered can still find and clean the device, since it was correctly left in the index", async () => {
+      kvZrange.mockRejectedValueOnce(new Error("kv unavailable"));
+
+      const first = await cleanupOperationalPushState("device-a");
+      expect(first.jobCleanupComplete).toBe(false);
+      expect(kvSrem).not.toHaveBeenCalled();
+
+      kvZrange.mockResolvedValue(["job-1"]);
+
+      const retry = await cleanupOperationalPushState("device-a");
+      expect(retry).toEqual({ cleanedJobs: 1, jobCleanupComplete: true });
+      expect(kvSrem).toHaveBeenCalledWith("push:devices:set", "device-a");
+    });
   });
 
   describe("strict mode", () => {
@@ -90,13 +148,16 @@ describe("cleanupOperationalPushState", () => {
 
       const result = await cleanupOperationalPushState("device-a", { strict: true });
 
-      expect(result).toEqual({ cleanedJobs: 2 });
+      expect(result).toEqual({ cleanedJobs: 2, jobCleanupComplete: true });
     });
 
     it("does not change default (non-strict) behavior", async () => {
       kvZrange.mockRejectedValue(new Error("kv unavailable"));
 
-      await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({ cleanedJobs: 0 });
+      await expect(cleanupOperationalPushState("device-a")).resolves.toEqual({
+        cleanedJobs: 0,
+        jobCleanupComplete: false,
+      });
     });
   });
 });

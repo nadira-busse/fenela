@@ -1,37 +1,14 @@
-// Trusted account deletion core (Phase 4G). Narrow and reusable: callers
-// must already have resolved and trust `userId` — this function performs
-// no authorization of its own. The public user-initiated boundary
-// (src/server/account/deleteOwnAccountAction.ts) derives userId from
-// requireUser(); a future inactivity-deletion path would derive it from
-// its own trusted source (not a browser session) and call this same
-// function, so the destructive sequence itself is never duplicated.
+// Trusted account-deletion core. Callers must already have resolved and trust
+// `userId`; this function performs no authorization of its own. User-initiated
+// deletion derives the id from the authenticated session, while retention uses
+// its own trusted candidate source. Both paths share this destructive sequence.
 //
-// Fail-closed by design — the opposite contract from sign-out cleanup
-// (src/app/auth/signOutOrchestration.ts), which is deliberately best-effort
-// because a user must always be allowed to leave their session. Account
-// deletion is irreversible, so every owned Device's operational KV state
-// must be confirmed clean (cleanupOperationalPushState with `strict: true`)
-// before auth.admin.deleteUser() ever runs. Any failure before that point
-// means the *canonical* account (PostgreSQL + Auth) is guaranteed to remain
-// fully intact — auth.admin.deleteUser() is never reached. That does NOT
-// mean operational KV cleanup itself is all-or-nothing: with multiple
-// Devices, an earlier Device's cleanup can already have completed before a
-// later Device's cleanup fails and this function returns. That partial KV
-// cleanup is safe to leave as-is — cleanupOperationalPushState is
-// idempotent (see its own header), so retrying deletion simply re-runs
-// cleanup for every Device again, including any already-cleaned ones, with
-// no ill effect. No rollback/reconstruction of partially-cleaned KV state
-// is attempted or needed.
-//
-// Once the auth.users row is gone, PostgreSQL's existing FK cascades
-// (supabase/migrations/20260809120000_mvp2_persistence_foundation.sql)
-// delete every canonical account-owned row: user_preferences,
-// reminder_preferences, goals -> anchors -> action_events/friction_events,
-// reflections, devices -> push_subscriptions. This function never issues
-// its own DELETE against any of those tables — one canonical relational
-// deletion root (auth.users) is enough, and a redundant manual delete
-// would only be able to race or duplicate what the cascade already
-// guarantees.
+// Deletion is fail-closed. Every owned device's required operational KV cleanup
+// must complete before the Auth identity is deleted. Cleanup for earlier devices
+// may already have succeeded when a later device fails; that operational work is
+// not rolled back. A retry runs the same idempotent cleanup path for every owned
+// device again. Canonical Auth/PostgreSQL state remains intact until the final
+// Auth deletion step, after which FK cascades remove account-owned rows.
 
 import { listDeviceIdsForUser } from "@/server/devices/listDeviceIdsForUser";
 import { cleanupOperationalPushState } from "@/lib/pushOperationalCleanup";
@@ -40,13 +17,34 @@ import { deleteAuthUserById } from "@/server/auth/deleteAuthUserById";
 export type DeleteAccountFailureStage =
   | "device_enumeration"
   | "operational_cleanup"
+  | "pre_deletion_guard"
   | "auth_deletion";
+
+export type DeleteAccountOptions = {
+  // Optional final guard evaluated after operational cleanup and immediately
+  // before Auth deletion. Retention uses this to re-check eligibility at the
+  // latest possible point; explicit user-initiated deletion does not supply it.
+  // A false result cancels deletion without touching canonical Auth/PostgreSQL
+  // state, although operational cleanup performed earlier in the attempt remains.
+  preAuthDeletionGuard?: () => Promise<boolean>;
+};
 
 export type DeleteAccountResult =
   | { ok: true }
-  | { ok: false; stage: DeleteAccountFailureStage; message: string };
+  | { ok: false; stage: DeleteAccountFailureStage; message: string }
+  // Distinct from a failure: the guard explicitly determined deletion must
+  // not proceed (e.g. the account is no longer retention-expired). Nothing
+  // went wrong — the correct decision was made not to delete. The Auth
+  // identity, and therefore every cascaded Postgres row, is left fully
+  // intact; only this run's operational KV cleanup (if any devices were
+  // owned) has already happened — see preAuthDeletionGuard's own comment
+  // for why this partial operational cleanup is an accepted trade-off.
+  | { ok: false; cancelled: true; reason: string };
 
-export async function deleteAccountForUser(userId: string): Promise<DeleteAccountResult> {
+export async function deleteAccountForUser(
+  userId: string,
+  options: DeleteAccountOptions = {}
+): Promise<DeleteAccountResult> {
   let deviceIds: string[];
 
   try {
@@ -71,6 +69,28 @@ export async function deleteAccountForUser(userId: string): Promise<DeleteAccoun
         ok: false,
         stage: "operational_cleanup",
         message: error instanceof Error ? error.message : "Operational cleanup failed.",
+      };
+    }
+  }
+
+  if (options.preAuthDeletionGuard) {
+    let stillEligible: boolean;
+
+    try {
+      stillEligible = await options.preAuthDeletionGuard();
+    } catch (error) {
+      return {
+        ok: false,
+        stage: "pre_deletion_guard",
+        message: error instanceof Error ? error.message : "Pre-deletion guard check failed.",
+      };
+    }
+
+    if (!stillEligible) {
+      return {
+        ok: false,
+        cancelled: true,
+        reason: "The pre-deletion guard determined this account should no longer be deleted.",
       };
     }
   }

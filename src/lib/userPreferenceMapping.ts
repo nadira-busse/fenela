@@ -79,7 +79,7 @@ export type UserPreferenceDbRow = {
 };
 
 // The canonical DB preference does not include dailyReminder/startTime
-// (reminder ownership is a later phase, ADR-004) — callers merge those in
+// (reminder ownership is defined in ADR-004); callers merge those in
 // from the existing local-only reminder state.
 export function mapDbRowToScreeningFields(
   row: UserPreferenceDbRow
@@ -108,7 +108,7 @@ export type UserPreferenceWriteInput = {
 
 export type PreferenceValidationResult = { ok: true } | { ok: false; message: string };
 
-// Server-boundary validation (AGENTS.md §12): runs regardless of what the
+// Server-boundary validation runs regardless of what the
 // caller's TypeScript types claim, since a Server Action is reachable as a
 // plain POST endpoint. Deliberately does not run free-text safety filtering
 // (src/lib/safety.ts) — every field here is an already-bounded choice, not

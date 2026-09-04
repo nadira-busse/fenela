@@ -65,7 +65,7 @@ describe("isDayStateCurrent", () => {
     expect(isDayStateCurrent(stored, "2026-08-09", G1)).toBe(true);
   });
 
-  it("treats same-day, same-goal authenticated state as stale when a task carries a legacy synthetic id (Phase 4C hardening, Defect A)", () => {
+  it("treats same-day, same-goal authenticated state as stale when a task carries a legacy synthetic id", () => {
     const stored = makeDayState({
       dayKey: "2026-08-09",
       goalId: G1,
@@ -132,7 +132,7 @@ describe("createDayStateFromAnchors", () => {
     expect(result.activeTasks.map((task) => task.text)).toEqual(["Drink water"]);
   });
 
-  it("uses the persisted database Anchor id when the anchor carries one (Phase 4C §7)", () => {
+  it("uses the persisted database Anchor id when the anchor carries one", () => {
     const result = createDayStateFromAnchors(
       [
         { id: "anchor-real-uuid-1", text: "Drink water", source: "USER" },
@@ -156,9 +156,8 @@ describe("createDayStateFromAnchors", () => {
 
 // Composes isDayStateCurrent + createDayStateFromAnchors exactly as
 // CoachingScreen.tsx's hydration effect does, proving the actual rebuild
-// decision boundary end-to-end rather than only the isolated validator
-// (Phase 4C hardening, Defect A §4).
-describe("legacy day-state rebuild boundary (Phase 4C hardening, Defect A)", () => {
+// decision boundary end-to-end rather than only the isolated validator.
+describe("legacy day-state rebuild boundary", () => {
   it("a stale legacy dayState is rebuilt from persisted careAnchors into task ids that pass the freshness check again", () => {
     const legacyStored = makeDayState({
       dayKey: "2026-08-09",

@@ -1,16 +1,7 @@
-// Deterministic WEEKLY/MONTHLY reflection period calculation (Phase 4E
-// §5/§7, ADR-005). Pure and framework-free so it is directly unit-testable
-// without a Supabase boundary — the exact same pipeline serves both
-// reflection types (§20), parameterized by `type`.
-//
-// The only timezone-sensitive step is establishing which local calendar
-// date `referenceInstant` falls on, in the caller's canonical
-// user_preferences.time_zone (never UTC, never a hardcoded zone — Phase
-// 4E §6). Reuses src/lib/timezone.ts's getZonedParts for that one step.
-// Everything after that is pure Gregorian calendar arithmetic on a
-// UTC-anchored placeholder Date used only as a date-math scratchpad — not
-// re-interpreted through any timezone again — so it is inherently immune
-// to DST (a week/month boundary is a calendar concept, not an instant).
+// Deterministic WEEKLY/MONTHLY reflection-period calculation. The only
+// timezone-sensitive step is resolving the local calendar date in the user's
+// canonical IANA timezone. Calendar arithmetic then uses a UTC-anchored Date as
+// a scratchpad, so week/month boundaries do not depend on DST offset changes.
 
 import { getZonedParts } from "@/lib/timezone";
 
@@ -43,7 +34,7 @@ function formatCalendarDate(date: Date): string {
 }
 
 function startOfWeek(anchor: Date): Date {
-  // getUTCDay(): 0=Sunday .. 6=Saturday. Weeks start Monday (§5).
+  // getUTCDay(): 0=Sunday .. 6=Saturday. Weeks start Monday.
   const dayOfWeek = anchor.getUTCDay();
   const daysSinceMonday = (dayOfWeek + 6) % 7;
 
@@ -57,7 +48,7 @@ export type GetPreviousCompletedWeeklyPeriodInput = {
   timeZone: string;
 };
 
-// Phase 4F §"Completed-week semantics": the most recently fully completed
+// Returns the most recently fully completed weekly period.
 // Monday..Sunday week as of `referenceInstant`'s local calendar date — never
 // the week `referenceInstant` itself falls in, since that week may still be
 // in progress and Reflection rows are immutable (persisting one for an

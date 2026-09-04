@@ -38,18 +38,18 @@ interface CoachingScreenProps {
     personalAnchorInterpretation?: PersonalAnchorInterpretation;
   };
   // The persisted Goal id this Coaching session belongs to (authenticated
-  // users only — Phase 4B hardening, Defect A). Undefined for the
-  // unauthenticated/local-only MVP1 path.
+  // users only). Undefined for the
+  // unauthenticated local-only path.
   goalId?: string;
   // The canonical DB reminder_preferences row for this authenticated user
-  // (Phase 4D, ADR-004), or null for the unauthenticated/local-only MVP1
+  // (ADR-004), or null for the unauthenticated local-only
   // path or when no row exists yet. When set, this — not any local
   // storage cache — is the sole source for the enabled/time state shown
   // below.
   reminderPreference?: { enabled: boolean; startTime: string } | null;
   onResetEverything: () => void;
   onRestartDay: () => void;
-  // New Goal archive state (Phase 4B hardening, Defect B) — owned by
+  // New Goal archive state, owned by
   // HomeClient, which runs the actual archive request.
   newGoalPending?: boolean;
   newGoalError?: string | null;
@@ -127,7 +127,7 @@ function saveDailyReminderSettings(input: { enabled: boolean; startTime: string 
 
 // Shared retry/error plumbing for the two ActionEvent/FrictionEvent writes
 // that gate a local UI transition (COMPLETED, PARKED_TODAY, and a friction
-// submission — Phase 4C §10). Not a generic persistence abstraction: it
+// submission). Not a generic persistence abstraction: it
 // only standardizes "attempt, and tell the caller whether local state may
 // now advance," while each call site still owns its own pending/error
 // state and stable client_event_id.
@@ -376,7 +376,7 @@ function ReminderSettingsLink({
   );
 }
 
-// The smallest possible authenticated account affordance (Phase 4G §2):
+// The smallest possible authenticated account affordance:
 // the normal product flow otherwise has no link at all to /auth, where
 // sign-out and account deletion live. Deliberately just a plain navigation
 // link (this repo has no next/link usage elsewhere) — not a settings
@@ -421,9 +421,9 @@ export default function CoachingScreen({
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [showReminderSettingsPage, setShowReminderSettingsPage] = useState(false);
 
-  // ActionEvent/FrictionEvent write state (Phase 4C §10) — only meaningful
+  // ActionEvent/FrictionEvent write state, only meaningful
   // for authenticated Coaching (goalId set); the unauthenticated/local-only
-  // MVP1 path never sets these.
+  // local-only path never sets these.
   const [completePending, setCompletePending] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [parkPending, setParkPending] = useState(false);
@@ -434,7 +434,7 @@ export default function CoachingScreen({
   const [postponeError, setPostponeError] = useState<string | null>(null);
 
   // Stable client_event_id per pending logical interaction, so a retry
-  // after a failed write reuses the same id (Phase 4C §5) instead of
+  // after a failed write reuses the same id instead of
   // generating a new one. Cleared back to null once that write succeeds,
   // so the next distinct interaction gets a fresh id. One ref per slot
   // instance keeps it stable across this component's re-renders, exactly
@@ -487,9 +487,9 @@ export default function CoachingScreen({
     }
 
     // For authenticated Coaching, reminder_preferences is the sole
-    // canonical source (Phase 4D, ADR-004) — no local storage cache is
-    // consulted, so a stale local value can never override it (Phase 4D
-    // §14/§25). The unauthenticated/local-only MVP1 path is unchanged.
+    // canonical source (ADR-004). No local storage cache is consulted, so
+    // a stale local value can never override it. The
+    // unauthenticated local-only path is unchanged.
     const reminderTime = goalId
       ? (reminderPreference?.startTime ?? "08:00")
       : getStoredDailyReminderTime(screening);
@@ -557,9 +557,9 @@ export default function CoachingScreen({
   };
 
   // reminder_preferences is the sole canonical enabled/start_time source
-  // (Phase 4D, ADR-004) — persisted here, before any push/schedule/cancel
-  // side effect, so the DB never contradicts what the UI is about to show
-  // (Phase 4D §7/§16). A no-op for the unauthenticated/local-only MVP1
+  // (ADR-004), persisted here before any push/schedule/cancel
+  // side effect, so the DB never contradicts what the UI is about to show.
+  // A no-op for the unauthenticated local-only
   // path (no goalId).
   const persistReminderPreference = async (enabled: boolean, startTime: string) => {
     if (!goalId) return true;
@@ -771,13 +771,13 @@ export default function CoachingScreen({
     await cancelNowReminder(jobId);
   };
 
-  // Fire-and-forget ActionEvent write for STARTED (Phase 4C §10): it does
+  // Fire-and-forget ActionEvent write for STARTED: it does
   // not correspond to a local taskHistory entry the End-of-day screen
   // already shows the user, so a failure here cannot create a visible
   // local/canonical contradiction — the local transition is not blocked on
   // it, matching this file's existing best-effort reminder-scheduling
   // pattern (see scheduleNowReminder/cancelNowReminder above). POSTPONED is
-  // NOT recorded through this helper (Phase 4C hardening, Defect B) — see
+  // NOT recorded through this helper; see
   // savePauseReason(), the single point that writes it.
   const recordActionEvent = (anchorId: string, eventType: ActionEventType) => {
     if (!goalId) return;
@@ -799,7 +799,7 @@ export default function CoachingScreen({
 
   // Reads the (uncontrolled) pause-reason textarea and, for authenticated
   // Coaching with real friction text, blocks on persisting it before the
-  // caller may advance the screen (Phase 4C §8/§18) — unlike
+  // caller may advance the screen. Unlike
   // recordActionEvent, a FrictionEvent corresponds to user-authored text
   // that must not silently disappear on failure. Returns true when it is
   // safe to proceed (nothing to submit, or the submission succeeded).
@@ -845,7 +845,7 @@ export default function CoachingScreen({
     // The pause-reason textarea only exists on PAUSE_QUESTION — reading it
     // here as well as from savePauseReason() means the friction answer is
     // captured regardless of which of that screen's two exits the user
-    // takes (Phase 4C §8/ADR-005).
+    // takes (ADR-005).
     if (state === "PAUSE_QUESTION") {
       const submitted = await submitFrictionIfPresent(currentTask.id);
       if (!submitted) return;
@@ -881,7 +881,7 @@ export default function CoachingScreen({
       setCompletePending(false);
 
       // Stay on AWAITING_DONE with the same currentTask so the user can
-      // retry with the same button (Phase 4C §10/§18) — the local
+      // retry with the same button. The local
       // taskHistory "done" entry below must not be written until this
       // succeeds, since that entry is what the End-of-day screen shows.
       if (!ok) return;
@@ -917,7 +917,7 @@ export default function CoachingScreen({
       return;
     }
 
-    // No ActionEvent here (Phase 4C hardening, Defect B): "Later" begins
+    // No ActionEvent here: "Later" begins
     // the postponement/pause flow, not the factual decision itself — the
     // decision is either "I'll do it now" (STARTED, no postponement after
     // all) or the final "Try again later" (POSTPONED, in savePauseReason).
@@ -957,8 +957,8 @@ export default function CoachingScreen({
     const submitted = await submitFrictionIfPresent(currentTask.id);
     if (!submitted) return;
 
-    // This is the final postponement decision (Phase 4C hardening,
-    // Defect B) — the one and only place POSTPONED is written, so it is
+    // This is the final postponement decision and the one place POSTPONED
+    // is written, so it is
     // blocking like COMPLETED/PARKED_TODAY: local state (the requeue back
     // to DO_ACTION below) must not advance until the factual event is
     // actually recorded, or a DB failure would produce false local success.
@@ -1014,7 +1014,7 @@ export default function CoachingScreen({
       setParkPending(false);
 
       // Stay on DIRECTIONAL_MOTIVATION with the same currentTask so the
-      // user can retry (Phase 4C §10/§18) — the local taskHistory "parked"
+      // user can retry. The local taskHistory "parked"
       // entry below must not be written until this succeeds.
       if (!ok) return;
 

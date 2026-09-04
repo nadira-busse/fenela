@@ -1,4 +1,4 @@
--- Fenéla MVP2 — Phase 4D hardening: service_role grants for the privileged
+-- Fenéla service_role grants for the privileged
 -- push_subscriptions cleanup path.
 --
 -- supabase/migrations/20260809120000_mvp2_persistence_foundation.sql assumed
@@ -11,8 +11,7 @@
 -- via information_schema.role_table_grants against the local database:
 -- service_role had only TRUNCATE/REFERENCES/TRIGGER, not SELECT/DELETE).
 --
--- This is a proven defect, not a hypothetical one: the privileged admin
--- cleanup path this phase introduces uses the privileged server-only client
+-- The privileged admin cleanup path uses the privileged server-only client
 -- (src/lib/supabase/adminClient.ts, SUPABASE_SECRET_KEY) for one narrow job:
 -- deleting a terminal-invalid PushSubscription during cron cleanup
 -- (src/server/devices/deletePushSubscriptionByDeviceId.ts). Running
@@ -24,7 +23,6 @@
 -- (read-to-confirm-idempotency, delete) this cleanup path needs. Not
 -- extended to devices/reminder_preferences/user_preferences/goals/anything
 -- else — none of that data is ever touched by this cleanup, and it must
--- stay that way (AGENTS.md §5/§12: smallest correct solution, no
--- speculative privilege grants).
+-- stay that way; no speculative privilege grants are included.
 
 grant select, delete on public.push_subscriptions to service_role;

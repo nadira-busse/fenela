@@ -1,5 +1,5 @@
-// Authenticated push-detach boundary for sign-out (Phase 4D final
-// hardening §4). Called only while a session still exists — logout order
+// Authenticated push-detach boundary for sign-out. Called only while a
+// session still exists; logout order
 // matters here (see src/app/auth/SignOutButton.tsx): this must run BEFORE
 // Supabase signout, or Device ownership can no longer be verified.
 //
@@ -40,8 +40,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing deviceId" }, { status: 400 });
     }
 
-    // A caller-supplied deviceId is never authorization proof (Phase 4D
-    // §9) — an unknown id and a foreign-owned id are deliberately
+    // A caller-supplied deviceId is never authorization proof. An unknown
+    // id and a foreign-owned id are deliberately
     // indistinguishable here (both a controlled 403), matching how
     // verifyOwnDevice is already used by the schedule/cancel routes.
     const ownsDevice = await verifyOwnDevice(deviceId);
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const dbResult = await deleteOwnPushSubscription(deviceId);
 
     if (!dbResult.ok) {
-      // Logged for debugging (Phase 4D final hardening §9) — the calling
+      // Logged for debugging; the calling
       // client (SignOutButton) treats any non-success response as
       // best-effort and completes sign-out regardless.
       console.warn("push/unsubscribe: DB cleanup failed", {

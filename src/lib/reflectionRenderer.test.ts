@@ -108,7 +108,7 @@ describe("renderDeterministicReflectionText", () => {
     expect(text).not.toMatch(/AI|model|GPT/i);
   });
 
-  it("includes friction presence as a factual count only — ReflectionFacts carries no raw reason text to echo (Phase 4H hardening)", () => {
+  it("includes friction presence as a factual count only because ReflectionFacts carries no raw reason text to echo", () => {
     const facts = makeFacts({}, 1);
     const text = renderDeterministicReflectionText(facts);
 

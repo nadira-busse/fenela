@@ -1,0 +1,26 @@
+-- Fenéla service_role grant for privileged
+-- reminder-preference verification at the cron push execution boundary.
+--
+-- As with push_subscriptions, reflections, and devices, BYPASSRLS lets
+-- service_role skip Row Level
+-- Security policy evaluation, but standard SQL GRANT/REVOKE table
+-- privileges are still enforced for every role, service_role included.
+-- supabase/migrations/20260809120000_mvp2_persistence_foundation.sql only
+-- granted `reminder_preferences` privileges to `authenticated`.
+--
+-- A failed job removal inside /api/jobs/cancel-daily-start can leave stale
+-- KV state even when reminder_preferences.enabled is false. The cron
+-- execution boundary therefore independently re-verifies canonical intent
+-- immediately before sending or rescheduling a DAILY_START job
+-- (src/server/reminders/getReminderEnabledForDevice.ts). That boundary has
+-- no user session — no browser cookies, no requireUser() — so it must use
+-- the privileged admin client, exactly like the other cron-reachable reads
+-- already do (src/server/devices/listDeviceIdsForUser.ts).
+--
+-- Scoped to exactly SELECT on `reminder_preferences` — the one read this
+-- verification step performs. Not INSERT/UPDATE: writes to this table stay
+-- on the normal authenticated RLS-scoped path
+-- (saveReminderPreferenceAction.ts), and this grant deliberately does not
+-- extend to any other table.
+
+grant select on public.reminder_preferences to service_role;

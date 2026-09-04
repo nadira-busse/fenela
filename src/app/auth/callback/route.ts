@@ -1,7 +1,7 @@
 // Authentication only: exchanges a Supabase auth code for a session and
 // redirects. Must not create goals, write preferences, create devices,
 // schedule reminders, or perform any onboarding business logic — that is
-// explicitly out of scope for this phase.
+// explicitly out of scope for this route.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";

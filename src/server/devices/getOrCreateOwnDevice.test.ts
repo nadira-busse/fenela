@@ -84,7 +84,7 @@ describe("getOrCreateOwnDevice", () => {
     expect(eqMock).toHaveBeenCalledWith("user_id", "user-a");
   });
 
-  it("creates a new device when the candidate id does not resolve to one owned by this user (e.g. a stale id from a different account, Phase 4D §11)", async () => {
+  it("creates a new device when the candidate id does not resolve to one owned by this user", async () => {
     maybeSingleMock.mockResolvedValue({ data: null, error: null });
     singleMock.mockResolvedValue({ data: { id: "device-new" }, error: null });
 

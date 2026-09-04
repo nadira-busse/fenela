@@ -1,6 +1,6 @@
 "use client";
 
-// Minimal, calm Phase 4F presentation surface: one compact card, the
+// Minimal, calm weekly-reflection surface: one compact card, the
 // existing deterministic generated_text, and a single Continue action.
 // Deliberately has no score/streak/percentage/comparison — see
 // ReflectionFacts (src/lib/reflectionAggregation.ts) and the renderer

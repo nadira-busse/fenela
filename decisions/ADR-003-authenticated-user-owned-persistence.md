@@ -23,7 +23,7 @@ Adding accounts, database ownership and cross-session persistence before that lo
 
 Browser-local state was therefore sufficient for MVP1.
 
-That changed during MVP2.
+The persistence model was later expanded to authenticated account-owned state.
 
 As Fenéla began preserving more of what the user deliberately enters and does over time, browser-local storage stopped being only an implementation detail. It became the boundary that determined whether the user's history could be trusted, recovered and kept separate from someone else's.
 

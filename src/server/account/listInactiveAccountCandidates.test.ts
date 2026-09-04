@@ -1,17 +1,23 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { createSupabaseAdminClient, listUsers, fromMock, selectMock, inMock } = vi.hoisted(() => ({
-  createSupabaseAdminClient: vi.fn(),
-  listUsers: vi.fn(),
-  fromMock: vi.fn(),
-  selectMock: vi.fn(),
-  inMock: vi.fn(),
-}));
+const { createSupabaseAdminClient, listUsers, getUserById, fromMock, selectMock, inMock } =
+  vi.hoisted(() => ({
+    createSupabaseAdminClient: vi.fn(),
+    listUsers: vi.fn(),
+    getUserById: vi.fn(),
+    fromMock: vi.fn(),
+    selectMock: vi.fn(),
+    inMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/supabase/adminClient", () => ({ createSupabaseAdminClient }));
 
-const { listInactiveAccountCandidates, RETENTION_SCAN_MAX_PAGES, RETENTION_SCAN_USERS_PER_PAGE } =
-  await import("./listInactiveAccountCandidates");
+const {
+  listInactiveAccountCandidates,
+  isAccountStillExpired,
+  RETENTION_SCAN_MAX_PAGES,
+  RETENTION_SCAN_USERS_PER_PAGE,
+} = await import("./listInactiveAccountCandidates");
 
 // Well clear of the 12-month threshold in either direction, so these
 // fixtures do not depend on retentionPolicy.ts's exact boundary math —
@@ -32,6 +38,7 @@ describe("listInactiveAccountCandidates", () => {
   beforeEach(() => {
     createSupabaseAdminClient.mockReset();
     listUsers.mockReset();
+    getUserById.mockReset();
     fromMock.mockReset();
     selectMock.mockReset();
     inMock.mockReset();
@@ -41,7 +48,7 @@ describe("listInactiveAccountCandidates", () => {
     inMock.mockResolvedValue({ data: [], error: null });
 
     createSupabaseAdminClient.mockReturnValue({
-      auth: { admin: { listUsers } },
+      auth: { admin: { listUsers, getUserById } },
       from: fromMock,
     });
   });
@@ -233,5 +240,93 @@ describe("listInactiveAccountCandidates", () => {
     await listInactiveAccountCandidates(referenceInstant);
 
     expect(fromMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("isAccountStillExpired final per-candidate recheck", () => {
+  beforeEach(() => {
+    createSupabaseAdminClient.mockReset();
+    listUsers.mockReset();
+    getUserById.mockReset();
+    fromMock.mockReset();
+    selectMock.mockReset();
+    inMock.mockReset();
+
+    selectMock.mockReturnValue({ in: inMock });
+    fromMock.mockReturnValue({ select: selectMock });
+    inMock.mockResolvedValue({ data: [], error: null });
+
+    createSupabaseAdminClient.mockReturnValue({
+      auth: { admin: { listUsers, getUserById } },
+      from: fromMock,
+    });
+  });
+
+  it("re-reads the current Auth user by id (not the scan-time snapshot) and returns true when still expired", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: { id: "user-1", last_sign_in_at: clearlyExpiredLogin } },
+      error: null,
+    });
+    inMock.mockResolvedValue({ data: [], error: null });
+
+    const result = await isAccountStillExpired("user-1", referenceInstant);
+
+    expect(getUserById).toHaveBeenCalledWith("user-1");
+    expect(fromMock).toHaveBeenCalledWith("user_activity");
+    expect(inMock).toHaveBeenCalledWith("user_id", ["user-1"]);
+    expect(result).toBe(true);
+  });
+
+  it("returns false when the user signed in again since the scan (became active)", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: { id: "user-1", last_sign_in_at: clearlyActiveLogin } },
+      error: null,
+    });
+    inMock.mockResolvedValue({ data: [], error: null });
+
+    const result = await isAccountStillExpired("user-1", referenceInstant);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when a fresh user_activity row now protects the account, even though last_sign_in_at is still old", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: { id: "user-1", last_sign_in_at: clearlyExpiredLogin } },
+      error: null,
+    });
+    inMock.mockResolvedValue({
+      data: [activityRow("user-1", clearlyActiveLogin)],
+      error: null,
+    });
+
+    const result = await isAccountStillExpired("user-1", referenceInstant);
+
+    expect(result).toBe(false);
+  });
+
+  it("throws when the Auth Admin API re-read itself fails, so the caller can fail closed", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: null },
+      error: { message: "User not found" },
+    });
+
+    await expect(isAccountStillExpired("user-1", referenceInstant)).rejects.toThrow(
+      "Failed to re-read Auth user for retention recheck: User not found"
+    );
+    // Must not fall through to the activity read once the Auth read itself
+    // has already failed.
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates a failed user_activity re-read rather than defaulting to either true or false", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: { id: "user-1", last_sign_in_at: clearlyExpiredLogin } },
+      error: null,
+    });
+    inMock.mockResolvedValue({ data: null, error: { message: "connection reset" } });
+
+    await expect(isAccountStillExpired("user-1", referenceInstant)).rejects.toThrow(
+      "connection reset"
+    );
   });
 });

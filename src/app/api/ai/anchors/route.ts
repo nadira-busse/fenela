@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import OpenAI, { APIError } from "openai";
 
 import {
   anchorCount,
@@ -22,6 +22,8 @@ import {
   UnauthenticatedError,
   type AuthenticatedUser,
 } from "@/server/auth/requireUser";
+import { getOwnUserPreference } from "@/server/preferences/getOwnUserPreference";
+import { mapAnchorChoiceModeFromDb } from "@/lib/userPreferenceMapping";
 
 export const runtime = "nodejs";
 
@@ -40,6 +42,75 @@ function hasText(value: unknown): value is string {
 // allowed request cannot still send an unbounded amount of text.
 const MAX_INTAKE_LENGTH = 500;
 const MAX_NAME_LENGTH = 100;
+
+// Use an explicit timeout rather than relying on the OpenAI SDK default (10
+// minutes) far exceeds any realistic serverless function execution budget.
+// Without an explicit bound, a slow/hanging provider response would keep
+// this request alive well past that budget, and the platform would kill
+// the function before the try/catch below ever gets a chance to return the
+// deterministic fallback it exists specifically to provide — turning an
+// intended graceful degradation into a hard failure for the user. Applied
+// per-call (generateAndValidate can make up to two sequential calls: the
+// initial generation and one repair attempt), not as a total-request
+// budget, so a slow-but-eventually-successful first call doesn't eat into
+// the repair attempt's own allowance.
+const OPENAI_REQUEST_TIMEOUT_MS = 10_000;
+
+// Canonical AI-assistance enforcement: a client-supplied
+// `mode` must never be trusted to widen into a provider call — only the
+// authenticated user's own canonical anchor_choice_mode preference
+// (user_preferences, Postgres) may authorize that. This reads it through
+// the existing, already-tested server-boundary read path
+// (getOwnUserPreference — the same helper the account-settings screen and
+// HomeClient's server render already rely on) rather than inventing a
+// second source of truth. Fails closed on every uncertain outcome: no row
+// yet (screening — which persists this same row — is awaited and blocks
+// progression to the anchor-generation step in the normal flow, so a
+// missing row here is never the legitimate "mid-onboarding" case) and any
+// read failure both resolve to "not allowed", never to a silently assumed
+// "allowed".
+async function isCanonicalAiAssistanceAllowed(): Promise<boolean> {
+  try {
+    const preference = await getOwnUserPreference();
+
+    if (!preference) {
+      return false;
+    }
+
+    return mapAnchorChoiceModeFromDb(preference.anchor_choice_mode) === "SUGGEST_ANCHORS";
+  } catch {
+    return false;
+  }
+}
+
+// Provider/SDK error logging is deliberately limited to bounded metadata;
+// messages are external, free-form diagnostic text with no guarantee about
+// what they contain — the OpenAI SDK's own APIError additionally carries
+// the response body verbatim as `.error`, which can itself echo back
+// request content. Only genuinely bounded, enum-like fields are logged:
+// the error's class name (safe — a fixed set of SDK-defined class names,
+// e.g. "RateLimitError", "APIConnectionTimeoutError"), the HTTP status, and
+// the provider's own short `code`/`type`/`requestID` identifiers. Never
+// `.message`, never `.error` (the raw response body), never a stack trace.
+function summarizeProviderError(error: unknown) {
+  if (error instanceof APIError) {
+    return {
+      errorClass: error.constructor.name,
+      status: error.status ?? null,
+      code: error.code ?? null,
+      type: error.type ?? null,
+      requestId: error.requestID ?? null,
+    };
+  }
+
+  return {
+    errorClass: error instanceof Error ? error.constructor.name : typeof error,
+    status: null,
+    code: null,
+    type: null,
+    requestId: null,
+  };
+}
 
 function hasBoundedText(value: unknown, maxLength: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
@@ -106,21 +177,24 @@ async function generateOpenAIResponse(input: {
   prompt: string;
   temperature?: number;
 }) {
-  const completion = await input.client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    temperature: input.temperature ?? 0.7,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You return only compact, valid JSON for a bounded accountability app. You never provide therapy, diagnosis, crisis advice or harmful instructions.",
-      },
-      {
-        role: "user",
-        content: input.prompt,
-      },
-    ],
-  });
+  const completion = await input.client.chat.completions.create(
+    {
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: input.temperature ?? 0.7,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You return only compact, valid JSON for a bounded accountability app. You never provide therapy, diagnosis, crisis advice or harmful instructions.",
+        },
+        {
+          role: "user",
+          content: input.prompt,
+        },
+      ],
+    },
+    { timeout: OPENAI_REQUEST_TIMEOUT_MS }
+  );
 
   return completion.choices[0]?.message?.content ?? "";
 }
@@ -241,6 +315,19 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Before any user content can reach OpenAI: independently verify canonical
+  // permission. The client-supplied `mode` above can only ever narrow toward
+  // the deterministic path (count === 0, handled above) — it must never be
+  // able to widen into calling a provider the user's own account-level
+  // preference says is off. This is the authoritative gate; everything
+  // below (API key presence, rate limiting, the actual call) only matters
+  // once this has already passed.
+  const canonicalAiAllowed = await isCanonicalAiAssistanceAllowed();
+
+  if (!canonicalAiAllowed) {
+    return NextResponse.json(buildFallbackResponse(body, count));
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(buildFallbackResponse(body, count));
   }
@@ -271,11 +358,30 @@ export async function POST(req: NextRequest) {
     });
 
     if (!generated) {
+      // Both the initial generation and the one repair attempt failed
+      // parsing, anchor validation or safety validation. Provider errors:
+      // logged so a systemic issue (a broken prompt, a schema drift, a
+      // provider degrading its own output quality) is visible to operators
+      // instead of silently reaching every caller as an unexplained
+      // fallback — every other failure path in this codebase (cron/push,
+      // reminder actions) already does this. Deliberately bounded to
+      // non-sensitive context only: never the user's goal/struggle/why
+      // text, and never the raw model response.
+      console.warn("aiAnchors.generationInvalid", { userId: user.id, mode: body.mode });
       return NextResponse.json(buildFallbackResponse(body, count));
     }
 
     return NextResponse.json(buildSuccessResponse(body, generated.parsed, generated.anchors));
-  } catch {
+  } catch (error) {
+    // Provider/network failure (timeout, rate limit, outage, ...) — logged
+    // through summarizeProviderError's own bounded fields only (see its
+    // header): never the free-form `.message`, never the raw response body,
+    // never the prompt or the model's output.
+    console.warn("aiAnchors.providerError", {
+      userId: user.id,
+      mode: body.mode,
+      ...summarizeProviderError(error),
+    });
     return NextResponse.json(buildFallbackResponse(body, count));
   }
 }

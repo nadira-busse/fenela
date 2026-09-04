@@ -7,7 +7,7 @@ import {
   REMINDER_TIME_ZONE,
 } from "./timezone";
 
-describe("nextZonedOccurrenceMs (Phase 4D §8 generalization)", () => {
+describe("nextZonedOccurrenceMs", () => {
   it("matches the Amsterdam-specific wrapper exactly when passed Europe/Amsterdam", () => {
     const now = Date.parse("2026-06-15T05:00:00.000Z");
 

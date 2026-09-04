@@ -1,106 +1,105 @@
 # Privacy and Data Lifecycle
 
-This document explains, factually and at a product level, what Fenéla stores, why it stores it, how long it keeps it and how it is deleted.
+This document describes the technical data model and lifecycle implemented by Fenéla. The deployment-facing legal explanation is in the [Privacy Notice](privacy-notice.md).
 
-This document describes how Fenéla currently collects, stores, uses and removes product data.
+## Stored data
 
-It is technical product documentation, not a lawyer-drafted privacy notice. Contractual and provider-specific matters that the repository cannot prove — such as data-processing agreements, hosting region and provider retention settings — are listed separately rather than presented as established facts.
+Canonical account-owned data is stored in Supabase PostgreSQL behind authenticated server boundaries and Row Level Security.
 
-Fenéla is an accountability app, not a therapy, medical or diagnostic product. It does not ask for and does not need health, mental-health or other special-category information to work.
+| Data                   | Purpose                                         |
+| ---------------------- | ----------------------------------------------- |
+| `user_preferences`     | Product, AI-assistance and timezone preferences |
+| `reminder_preferences` | Reminder intent and daily start time            |
+| `goals` / `anchors`    | Current accountability structure                |
+| `action_events`        | Immutable factual action history                |
+| `friction_events`      | Immutable factual friction history              |
+| `reflections`          | Immutable deterministic reflection snapshots    |
+| `devices`              | Authenticated device ownership                  |
+| `push_subscriptions`   | Device-specific Web Push capability             |
+| `user_activity`        | Server-observed activity used for retention     |
 
-## What Fenéla stores
+Browser storage is limited to local UI/device state and is not the source of truth for account-owned records.
 
-| Data                                                                                                                    | Purpose                                                                                                              | Retention while active             | AI exposure                                                   |
-| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
-| Auth identity (email, session state)                                                                                    | Sign-in and identifying which account owns everything below                                                          | Until deletion                     | No                                                            |
-| Account activity signal                                                                                                 | Recognizes an account as actively used, so the 12-month retention policy never mistakes ongoing use for inactivity   | Until deletion                     | No                                                            |
-| Display name                                                                                                            | Personalizes on-screen copy                                                                                          | Until deletion                     | No                                                            |
-| Guidance preferences (anchor-choice mode, resistance pattern, main challenge, action trigger, anti-help list, timezone) | Shapes deterministic copy and AI prompt context                                                                      | Until deletion                     | Yes (the preference categories, not the timezone)             |
-| Reminder preference (enabled, daily start time)                                                                         | Controls optional daily reminder scheduling                                                                          | Until deletion                     | No                                                            |
-| Goal (title, why, initial struggle, status)                                                                             | The one active goal the anchors are built around                                                                     | Until deletion                     | Yes (title, why, initial struggle)                            |
-| Anchors (text, source, position, status)                                                                                | The small actions the user works through                                                                             | Until deletion                     | No (anchors are usually AI's _output_, not re-sent as input)  |
-| Action events (started/completed/postponed/parked, timestamps)                                                          | Factual history behind deterministic reflections                                                                     | Until deletion                     | No                                                            |
-| Friction events (user-entered reason text, timestamps)                                                                  | The user's own explanation of a specific difficulty; factual history                                                 | Until deletion                     | No                                                            |
-| Reflections (period, deterministic facts snapshot, generated text)                                                      | Short weekly summary of the above history (the underlying schema and aggregation logic also support monthly periods) | Until deletion                     | No — current reflections are deterministic. — see "AI" below) |
-| Devices                                                                                                                 | Which browser/installation belongs to the account, for reminder delivery                                             | Until deletion                     | No                                                            |
-| Push subscriptions                                                                                                      | The technical endpoint needed to deliver a Web Push notification                                                     | Until deletion                     | No                                                            |
-| Operational push-delivery state (KV)                                                                                    | Scheduling/delivery bookkeeping mirroring the above                                                                  | Until deletion or reminder disable | No                                                            |
-| Browser-local compatibility state                                                                                       | Lets the current UI read screening/anchor/day state without a network round trip                                     | Until sign-out or account deletion | No                                                            |
+KV-compatible storage holds derived operational state for reminders and rate limiting, including device-indexed jobs, daily-start pointers, cached push-subscription payloads and rate-limit counters.
 
-Every row above is scoped to one authenticated account (PostgreSQL Row Level Security) or one device (KV, browser storage) and is never shared between accounts.
+## AI data flow
 
-## Why Fenéla stores it
+OpenAI is used only for optional anchor suggestions.
 
-Each category above exists to support one part of the core loop: turning a stated goal into small anchors, tracking whether the user returns to them, and being able to say something true and specific in a weekly reflection. Fenéla does not collect data for analytics, profiling, or any purpose beyond running the product for the account that owns it.
+Before a provider call is allowed, the server verifies the authenticated user's canonical AI-assistance preference. When AI assistance is disabled, Fenéla does not send intake data to OpenAI.
 
-## Retention
+When enabled, the provider receives only:
 
-Fenéla deletes accounts and their account-owned data after 12 months without authenticated Fenéla product activity.
+- goal;
+- why the goal matters;
+- current struggle entered during intake;
+- guidance-preference categories used to shape suggestions.
 
-Users may permanently delete their account earlier from within Fenéla, at any time, from `/auth`.
+It does not receive account identity/email, display name, event history, reflection facts, timezone, retention state or deletion state.
 
-The 12-month period is Fenéla's own chosen data-retention policy — a concrete, explainable storage-limitation boundary — not a period the GDPR/AVG itself prescribes for this product. It exists so account-owned personal data does not accumulate indefinitely for accounts that have stopped being used.
+AI output is untrusted derived data. It is parsed, validated and safety-checked before display, and nothing becomes canonical Goal/Anchor state until the user confirms it and the persistence boundary validates it again.
 
-"Activity" is derived from server-observed authenticated use of Fenéla, not from anything the browser alone reports. Signing in is always a safe baseline signal, but Fenéla also recognizes ongoing use of an already-signed-in session, so a genuinely active account is never mistaken for inactive just because it hasn't needed a fresh sign-in recently.
-
-No advance warning email is sent before this deletion. Fenéla does not currently have any email-sending infrastructure, and building one solely for a retention warning would be disproportionate to what this feature needs. This is a current product behavior, not a claimed legal requirement or limitation.
-
-## Account deletion
-
-Both user-initiated deletion and 12-month inactivity retention delete an account through the exact same mechanism:
-
-```text
-resolve the account's owned Devices
-→ clean up their operational push-delivery state
-→ delete the Supabase Auth identity
-→ PostgreSQL foreign-key cascades remove every account-owned row
-  (preferences, the account activity signal, goals, anchors,
-  action/friction history, reflections, devices, push subscriptions)
-→ (user-initiated only) the browser clears its own local Fenéla-owned
-  state and the current session
-```
-
-This is a permanent, hard deletion. There is no soft delete, no recovery window and no export step — once it runs, the data is gone.
-
-Deletion is fail-closed before the irreversible step: if cleaning up a Device's operational state fails, the Auth identity is not deleted. The account's canonical Auth and PostgreSQL data always remains intact in that case — but operational push-delivery cleanup may already have partially succeeded for some of the account's devices before the failure. That partial cleanup is never undone; it is simply safe to leave as-is, because retrying deletion cleans up every device again regardless of what a previous attempt already finished. Only once that cleanup succeeds in full does the Auth identity get deleted, which is what triggers the PostgreSQL cascade.
-
-## AI
-
-When AI-assisted anchor generation is enabled and configured, the model receives: the user's goal, "why," and stated current struggle (as entered at intake), plus the guidance-preference categories (resistance pattern, main challenge, action trigger, anti-help list). The user's display name is not included.
-
-The model does not receive: friction-event reason text, action/friction event history, reflection facts, account identity/email, or timezone.
-
-AI is never the source of truth for event history, friction counts, reflection facts, account ownership, retention eligibility, or any deletion decision — all of those are deterministic application logic. AI only ever produces anchor _suggestions_, which the user can keep, edit, regenerate or discard.
-
-Weekly reflection is entirely deterministic: a fixed template is filled from stored facts, with no model call in that path. The same deterministic aggregation logic also supports monthly periods as a technical foundation, but there is no monthly user-facing reflection flow.
+Weekly reflection is deterministic and does not call an AI provider.
 
 ## Free text
 
-A few fields in Fenéla are free text the user types themselves: the goal, why, and struggle at intake; anchor wording; and the friction-moment reason. None of Fenéla's own prompts or labels ask for health, mental-health, religious, ethnic, sexual-orientation, political or other special-category information — they ask practical questions like "what usually gets in the way?" and "why does this matter to you?"
+The user can enter free text for goal/context, anchor wording and friction reasons. Fenéla's own labels do not request special-category information, but a user can choose to type sensitive information into any open text field.
 
-A user could still choose to type something sensitive into any of these fields; that is a normal property of any open text field and does not, by itself, make Fenéla a health or therapy product. If you'd rather not, there's no need to include more personal detail than the practical question calls for.
+Friction reason text is stored as factual history but is not copied into reflection snapshots or sent to OpenAI.
+
+## Reminders and operational state
+
+Reminder intent is canonical PostgreSQL state. Push subscriptions are device-specific delivery capability. KV jobs and pointers are derived operational state.
+
+A one-shot `TASK_REMINDER` is claimed before Fenéla makes one application-level send attempt. It is not automatically resent after an ambiguous provider failure. `DAILY_START` uses a separate pointer/rescheduling model.
+
+Push delivery is best effort and depends on browser, operating-system and provider infrastructure.
+
+## Account deletion
+
+Users can request permanent account deletion from `/auth`.
+
+The deletion path:
+
+1. derives the authenticated user server-side;
+2. enumerates owned devices;
+3. cleans required operational push state;
+4. performs any final retention eligibility guard when deletion was initiated by retention;
+5. deletes the Supabase Auth identity;
+6. relies on database cascades to remove account-owned PostgreSQL rows.
+
+Deletion fails closed before the irreversible Auth step. If required operational cleanup fails, the Auth identity and canonical PostgreSQL data remain. Cleanup for some devices may already have succeeded; that work is not rolled back, and a later deletion attempt runs the same cleanup path again.
+
+There is no soft-delete recovery period after Auth deletion succeeds.
+
+## Inactivity retention
+
+Fenéla applies a 12-month inactivity policy using the most recent valid authenticated activity signal from:
+
+- `auth.users.last_sign_in_at`;
+- `user_activity.last_active_at`.
+
+The activity timestamp is server-controlled because it contributes to a destructive retention decision.
+
+The hosted deployment runs retention processing on a schedule. The scan is bounded; if the configured page limit is reached, the result reports that the scan was truncated rather than presenting a partial scan as complete.
+
+User-initiated deletion and inactivity deletion use the same deletion core.
 
 ## External services
 
-Fenéla currently relies on the following external infrastructure. These are technical data recipients / service providers for the stated purpose — this document does not make a legal determination of each provider's processor status; that is a contractual matter, see "Limitations" below.
+| Service                        | Purpose                                  | Data that may reach it                                              |
+| ------------------------------ | ---------------------------------------- | ------------------------------------------------------------------- |
+| Supabase                       | Authentication and canonical persistence | Account-owned application data                                      |
+| Vercel                         | Application hosting                      | Standard request/deployment traffic                                 |
+| KV-compatible storage          | Reminder/rate-limit operational state    | Device IDs, push subscription data, reminder jobs, rate-limit state |
+| OpenAI                         | Optional anchor suggestions              | Bounded intake/context fields when AI is enabled                    |
+| Browser/OS push infrastructure | Push delivery                            | Push endpoint and notification payload                              |
 
-| Service                                                                                                  | Used for                                               | Data that may reach it                                                                                                                |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Supabase (Auth + PostgreSQL)                                                                             | Authentication and canonical account-owned persistence | Everything in the "What Fenéla stores" table above                                                                                    |
-| Vercel                                                                                                   | Application hosting/deployment                         | Standard request traffic; may also host the KV integration below                                                                      |
-| KV-compatible storage (accessed via the `@vercel/kv` client against an Upstash-compatible REST endpoint) | Operational push-delivery scheduling state             | Device IDs, push subscription endpoints/keys, scheduled reminder job payloads (Fenéla-authored notification text, not user free text) |
-| OpenAI                                                                                                   | Optional AI-assisted anchor generation                 | Goal, why, struggle, guidance-preference categories (see "AI" above) — only while AI assistance is enabled and configured             |
-| Browser/OS push services (e.g. the browser vendor's Web Push infrastructure)                             | Delivering reminder notifications                      | The push subscription endpoint and the notification payload, when reminders are enabled                                               |
+Source code cannot establish provider-contract details such as DPAs, production data-region settings, provider-side log retention or backup deletion. Those remain deployment/operator responsibilities.
 
-## Limitations
+## Related documents
 
-This document describes what the codebase actually does. It does not, and cannot, confirm from source code alone:
-
-- whether a signed data-processing agreement (DPA) exists with each provider above;
-- each provider's own data-region/residency configuration for the production account;
-- each provider's own internal retention of logs or backups (Fenéla deleting its own copy of a user's data does not delete that provider's independent operational logs, if any);
-- production-account-level settings (e.g. OpenAI request retention/training settings) beyond what this repository configures.
-
-Those are release-checklist items for whoever operates the production deployment, not facts this document asserts.
-
-The 12-month retention job is a bounded, sequential batch (see [architecture overview](../../architecture/architecture-overview.md)) rather than a queueing platform designed for unlimited scale; this is an accepted engineering trade-off for Fenéla's current scale.
+- [Privacy Notice](privacy-notice.md)
+- [AI and ethical-use guardrails](ai-guardrails.md)
+- [Known limitations](known-limitations.md)
+- [Architecture overview](../../architecture/architecture-overview.md)

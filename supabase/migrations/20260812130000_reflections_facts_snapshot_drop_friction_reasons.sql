@@ -1,4 +1,4 @@
--- Fenéla MVP2 — Phase 4H hardening: remove duplicated raw friction text
+-- Remove duplicated raw friction text
 -- from existing persisted Reflection snapshots.
 --
 -- ReflectionFacts.friction.reasons (src/lib/reflectionAggregation.ts) has

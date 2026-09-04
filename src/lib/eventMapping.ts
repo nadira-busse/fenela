@@ -1,4 +1,4 @@
-// Validation for the ActionEvent/FrictionEvent write boundary (Phase 4C).
+// Validation for the ActionEvent/FrictionEvent write boundary.
 // Mirrors src/lib/goalMapping.ts's server-boundary validation pattern:
 // runs regardless of what the caller's TypeScript types claim, since the
 // Server Actions calling this are reachable as plain POST endpoints. The
@@ -25,8 +25,8 @@ export function isActionEventType(value: unknown): value is ActionEventType {
 }
 
 // Exported so src/lib/storage.ts can reuse the exact same "is this a
-// persisted database id, not a legacy/synthetic local one" check (Phase 4C
-// hardening, Defect A) instead of a second, parallel UUID validator.
+// persisted database id, not a legacy/synthetic local one" check instead
+// of a second, parallel UUID validator.
 export function isUuidShaped(value: unknown): value is string {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }

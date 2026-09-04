@@ -1,5 +1,5 @@
-// Narrow, non-destructive authenticated-activity touch (Phase 4H,
-// hardened). The retention policy (retentionPolicy.ts) needs a
+// Narrow, non-destructive authenticated-activity touch. The retention
+// policy (retentionPolicy.ts) needs a
 // server-observed "this account is actually being used" signal that
 // advances on more than just a new sign-in — Supabase Auth's own
 // `last_sign_in_at` only moves on a fresh sign-in event, so a user who

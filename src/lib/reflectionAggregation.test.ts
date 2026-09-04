@@ -103,7 +103,7 @@ describe("aggregateReflectionFacts", () => {
   });
 
   describe("friction", () => {
-    it("counts entries without persisting the raw reason text (Phase 4H hardening — no current consumer)", () => {
+    it("counts entries without persisting raw reason text that has no current consumer", () => {
       const facts = aggregateReflectionFacts({
         period: PERIOD,
         actionEvents: [],

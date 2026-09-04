@@ -1,7 +1,7 @@
 "use server";
 
-// Public-facing mutation boundary for appending an immutable FrictionEvent
-// (Phase 4C, ADR-005). Records only the user's own factual free-text
+// Public-facing mutation boundary for appending an immutable FrictionEvent.
+// Records only the user's own factual free-text
 // answer to "What is making this step hard right now?" — no sentiment
 // analysis, psychological classification, or AI interpretation.
 //

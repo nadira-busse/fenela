@@ -1,7 +1,7 @@
 "use server";
 
 // Public-facing, client-callable Server Action boundary for permanent
-// account deletion (Phase 4G). Accepts NO input at all — user identity
+// account deletion. Accepts NO input at all; user identity
 // comes exclusively from requireUser(), never from a caller-supplied
 // user_id/email/device id. A confirmation UI step exists purely as a UX
 // safeguard (src/app/auth/DeleteAccountButton.tsx); it is never sent here

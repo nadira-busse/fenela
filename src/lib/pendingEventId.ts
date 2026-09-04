@@ -1,6 +1,6 @@
-// The stable-client_event_id-across-retry mechanism (Phase 4C §5, extended
-// in Phase 4C hardening §8) used by every blocking ActionEvent/FrictionEvent
-// write in src/app/components/CoachingScreen.tsx (COMPLETED, PARKED_TODAY,
+// The stable-client_event_id-across-retry mechanism used by every blocking
+// ActionEvent/FrictionEvent write in src/app/components/CoachingScreen.tsx
+// (COMPLETED, PARKED_TODAY,
 // the final POSTPONED, and the friction submission). Extracted into a
 // framework-free helper so this specific claim — a retry before success
 // reuses the same id, and the next distinct interaction after success gets

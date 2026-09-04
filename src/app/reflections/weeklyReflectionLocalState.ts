@@ -1,5 +1,5 @@
-// Device-local "has this weekly reflection already been shown" marker
-// (Phase 4F "when to show" mechanism). Reflection rows are immutable and
+// Device-local "has this weekly reflection already been shown" marker.
+// Reflection rows are immutable and
 // idempotent per period, so re-resolving the eligible week is cheap and
 // always returns the same row for the rest of that week — without some
 // local memory of "already shown", the same weekly card would reappear on

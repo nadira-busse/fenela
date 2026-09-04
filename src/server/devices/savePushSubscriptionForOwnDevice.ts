@@ -1,12 +1,12 @@
 // Persists a Web Push subscription under the authenticated caller's own
-// Device (Phase 4D §12/§13). Not a Server Action — called from
+// Device. Not a Server Action; called from
 // src/app/api/push/subscribe/route.ts.
 //
 // push_subscriptions.device_id and .endpoint each carry a DB UNIQUE
 // constraint (supabase/migrations/20260809120000_mvp2_persistence_foundation.sql).
 // Upserting on device_id is the deliberate conflict target: a changed Web
 // Push subscription for the same already-owned Device replaces that
-// Device's row rather than creating a duplicate (§13). If the endpoint is
+// Device's row rather than creating a duplicate. If the endpoint is
 // already used by a *different* device, the endpoint's own unique
 // constraint fails the write and this surfaces as a generic DATABASE_ERROR
 // — this never reassigns/steals another device's subscription.

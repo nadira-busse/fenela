@@ -10,7 +10,7 @@ const { createReflectionForPeriod } = await import("./createReflectionForPeriod"
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
 
-// Regression coverage for the code-review finding: createReflectionForPeriod
+// Verifies that createReflectionForPeriod
 // is a "use server" Server Action, so its input is untrusted. Reflection
 // rows are immutable and idempotent per (user, type, period) — a
 // caller-chosen referenceInstant could otherwise permanently lock in an

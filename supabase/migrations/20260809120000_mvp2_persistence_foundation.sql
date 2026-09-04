@@ -1,4 +1,4 @@
--- Fenéla MVP2 — Phase 3C-1: Supabase persistence foundation
+-- Fenéla Supabase persistence foundation
 --
 -- Implements the relational schema, constraints, indexes and Row Level
 -- Security for the domain model accepted in:
@@ -9,8 +9,7 @@
 -- Identity root is Supabase's own auth.users table (ADR-003). No second
 -- application-level `users` table is created.
 --
--- This migration is schema/RLS only. No application runtime code depends on
--- it yet (Phase 3C-1 scope boundary).
+-- This migration defines schema and RLS only.
 
 -- =============================================================================
 -- user_preferences
@@ -35,7 +34,7 @@ create table public.user_preferences (
 );
 
 comment on table public.user_preferences is
-  'One row per authenticated user. Canonical home for the guidance preferences that already change deterministic copy and AI prompt context today (see docs/product/mvp2-input-audit.md).';
+  'One row per authenticated user. Canonical home for guidance preferences that influence deterministic copy and AI prompt context.';
 comment on column public.user_preferences.time_zone is
   'IANA timezone identifier (e.g. Europe/Amsterdam). Identifier format is validated in application code; this constraint only rejects empty values.';
 
@@ -214,7 +213,7 @@ create table public.push_subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint push_subscriptions_endpoint_key unique (endpoint),
-  -- At most one current subscription per device for MVP2 (ADR-004).
+  -- At most one current subscription per device (ADR-004).
   constraint push_subscriptions_device_id_key unique (device_id)
 );
 
@@ -263,7 +262,7 @@ create trigger push_subscriptions_set_updated_at
 -- A service-role key can bypass RLS, but it still needs the relevant table
 -- privileges; narrow service-role grants are added explicitly where required.
 --
--- No table in this migration grants anything to `anon` — MVP2 has no
+-- No table in this migration grants anything to `anon`; Fenéla has no
 -- anonymous-authentication stage (ADR-003) — so every policy below is scoped
 -- `to authenticated` only. Table-level GRANTs are explicit rather than relied
 -- on implicitly, because the current Supabase default (see
@@ -488,8 +487,7 @@ grant select, insert on public.friction_events to authenticated;
 -- ---------------------------------------------------------------------------
 -- reflections — direct ownership, SELECT-only for authenticated users.
 --
--- Explicit least-privilege decision (AGENTS.md §12/§18 requires this to be
--- documented, not guessed): ADR-005 describes reflection generation as
+-- Explicit least-privilege decision: ADR-005 describes reflection generation as
 -- deterministic aggregation -> optional AI wording -> validation -> fallback,
 -- an orchestrated server-side process analogous to the existing
 -- /api/ai/anchors route, not a value the client assembles and writes
@@ -499,8 +497,8 @@ grant select, insert on public.friction_events to authenticated;
 -- privileges. The reflection write boundary is implemented separately with
 -- the minimum SELECT/INSERT grants required for that operation. No INSERT/UPDATE
 -- policy or grant is created here for `authenticated`.
--- If a future phase decides the client should write reflections directly,
--- that is a product/architecture decision to make explicitly then, not a
+-- If the client is ever allowed to write reflections directly, that must be
+-- an explicit product and architecture decision, not a
 -- default this migration should assume.
 -- ---------------------------------------------------------------------------
 

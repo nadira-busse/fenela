@@ -33,9 +33,9 @@ const APP_TIME_ZONE = "Europe/Amsterdam";
 
 export type ActiveTask = {
   // The persisted database Anchor id when this task was built from an
-  // authenticated Anchor with one (Phase 4C §7); otherwise a synthetic
+  // authenticated Anchor with one; otherwise a synthetic
   // per-position id (`a1`, `a2`, ...) for the unauthenticated/local-only
-  // MVP1 path or legacy data. Authenticated Coaching interactions use this
+  // local-only path or legacy data. Authenticated Coaching interactions use this
   // as the ActionEvent/FrictionEvent anchor_id — never a synthetic id.
   id: string;
   text: string;
@@ -45,8 +45,8 @@ export type ActiveTask = {
 export type DayState<TTaskHistoryItem = never> = {
   version: 3;
   dayKey: string;
-  // The persisted Goal this day state was built from (Phase 4B hardening,
-  // Defect A). Absent for the unauthenticated/local-only MVP1 path and for
+  // The persisted Goal this day state was built from. Absent for the
+  // unauthenticated local-only path and for
   // legacy day state saved before this field existed — both are treated as
   // "no goal identity to check", not as a fabricated match.
   goalId?: string;
@@ -82,19 +82,17 @@ export const saveDayState = <TTaskHistoryItem = never>(state: DayState<TTaskHist
 
 export const clearDayState = () => removeFromStorage(DAY_STATE_KEY);
 
-// Extracted so the reuse-vs-rebuild decision (Phase 4B hardening, Defect A;
-// extended in Phase 4C hardening, Defect A) is unit-testable on its own —
+// Extracted so the reuse-vs-rebuild decision is unit-testable on its own;
 // CoachingScreen.tsx has no render-level test coverage in this repo (no
 // RTL/jsdom dependency). Day state may only be reused when it is from
 // today AND belongs to the same persisted Goal. `goalId` is `undefined`
-// for the unauthenticated/local-only MVP1 path and for legacy day state
+// for the unauthenticated local-only path and for legacy day state
 // saved before this field existed; both sides being `undefined` compares
 // equal, preserving the original dayKey-only behavior for that path.
 //
 // For an authenticated persisted Goal (`goalId` defined), reuse additionally
-// requires every active task to carry a valid persisted Anchor UUID
-// (Phase 4C hardening, Defect A): a same-day, same-goal dayState saved
-// before Phase 4C's createDayStateFromAnchors() fix can still contain
+// requires every active task to carry a valid persisted Anchor UUID. A
+// same-day, same-goal legacy dayState can still contain
 // synthetic ids (`a1`, `a2`, ...), which ActionEvent/FrictionEvent writes
 // cannot use as anchor_id. Treating that as stale forces the caller's
 // existing "not current" branch to rebuild from the current DB-restored
@@ -119,10 +117,10 @@ export function isDayStateCurrent<TTaskHistoryItem>(
 
 export const CARE_ANCHORS_KEY = "careAnchors";
 
-// Plain strings are legacy/pre-Phase-4B shape and carry no provenance or id.
-// `id`, when present, is the persisted database Anchor id (Phase 4B
+// Plain strings are a legacy shape and carry no provenance or id. `id`,
+// when present, is the persisted database Anchor id (from
 // createGoalWithAnchorsAction / DB restore via mapActiveGoalToCompatibilityState)
-// — absent for the unauthenticated/local-only MVP1 path and for legacy
+// — absent for the unauthenticated local-only path and for legacy
 // entries saved before ids were tracked.
 export type StoredCareAnchor = string | { id?: string; text?: string; source?: AnchorSource };
 
@@ -141,8 +139,8 @@ function getAnchorText(anchor: unknown) {
   return String(anchor ?? "");
 }
 
-// No recorded source (a plain string, or an object that predates Phase 4B
-// provenance tracking) defaults to USER — the safest assumption, since it
+// No recorded source (a plain string or an object without provenance)
+// defaults to USER — the safest assumption, since it
 // is never persisted as AI/FALLBACK without the app having actually
 // recorded that provenance.
 export function getAnchorSource(anchor: unknown): AnchorSource {
@@ -166,8 +164,8 @@ function getAnchorTexts(anchors: StoredCareAnchor[]) {
   return anchors.map(getAnchorText);
 }
 
-// The persisted database Anchor id, when this anchor carries one (Phase 4C
-// §7) — undefined for the unauthenticated/local-only MVP1 path and for
+// The persisted database Anchor id when this anchor carries one. Undefined
+// for the unauthenticated local-only path and for
 // legacy entries saved before ids were tracked, in which case the caller
 // falls back to a synthetic per-position id.
 function getAnchorId(anchor: unknown): string | undefined {

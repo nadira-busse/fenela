@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveScreeningReminderOutcome } from "./screeningReminderOutcome";
 
 describe("resolveScreeningReminderOutcome", () => {
-  it("screening Yes with a successful save reports enabled: true (the reported defect's happy path)", () => {
+  it("screening Yes with a successful save reports enabled: true", () => {
     expect(
       resolveScreeningReminderOutcome({
         reminderPreferenceSaved: true,

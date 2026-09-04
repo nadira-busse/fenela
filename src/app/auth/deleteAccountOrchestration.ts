@@ -1,4 +1,4 @@
-// The actual account-deletion step sequence (Phase 4G), analogous to
+// The account-deletion step sequence, analogous to
 // src/app/auth/signOutOrchestration.ts but with the opposite failure
 // contract. Sign-out cleanup is best-effort because a user must always be
 // allowed to leave their session; account deletion is destructive and

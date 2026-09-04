@@ -15,6 +15,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:rls": "vitest run --config vitest.rls.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:types": "npx supabase gen types typescript --local > src/types/database.types.ts && npx prettier --write src/types/database.types.ts"

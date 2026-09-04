@@ -12,7 +12,7 @@ describe("resolveReminderPreference", () => {
     expect(resolveReminderPreference(undefined, null)).toBeNull();
   });
 
-  it("prefers a just-persisted override over a stale server value (the reported defect)", () => {
+  it("prefers a just-persisted override over a stale server value", () => {
     const staleServerValue = { enabled: false, startTime: "08:00" };
     const justPersisted = { enabled: true, startTime: "07:30" };
 

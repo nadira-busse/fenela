@@ -1,4 +1,4 @@
-// Server-side Device resolution for an authenticated user (Phase 4D §9/§10).
+// Server-side Device resolution for an authenticated user.
 // Not a Server Action — called from Route Handlers
 // (src/app/api/push/subscribe/route.ts), which are already server-only.
 //
@@ -10,10 +10,10 @@
 //
 // A caller-supplied candidate id that does not resolve to an owned,
 // non-revoked Device (unknown id, or an id owned by a different user — the
-// same physical browser after an account switch, Phase 4D §11) results in
+// same physical browser after an account switch) results in
 // a fresh Device being created, never a reassignment of the existing one.
 // This is also how first-ever authenticated registration works: the
-// client's pre-existing MVP1-style local id is passed in as a candidate,
+// client's pre-existing local id is passed in as a candidate,
 // found not to exist in `devices`, and a new server-generated Device id is
 // created and returned for the client to cache going forward.
 

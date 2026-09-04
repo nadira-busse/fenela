@@ -86,7 +86,7 @@ export async function saveSubscriptionToServer(sub: PushSubscription) {
   }
 
   // For an authenticated caller, the server may return a different,
-  // ownership-verified device id than the one just sent (Phase 4D §9/§10)
+  // ownership-verified device id than the one just sent
   // — every subsequent schedule/cancel call must use that one.
   const effectiveDeviceId =
     typeof data?.deviceId === "string" && data.deviceId.length > 0 ? data.deviceId : deviceId;

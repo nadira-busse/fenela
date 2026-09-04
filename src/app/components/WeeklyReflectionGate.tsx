@@ -1,6 +1,6 @@
 "use client";
 
-// Thin wiring for the Phase 4F weekly reflection product flow. All the
+// Thin wiring for the weekly reflection product flow. All the
 // actual decision logic lives in resolveWeeklyReflectionOnReturn.ts (unit
 // tested there); this component just calls it once per page load and
 // swaps between the reflection card and its normal children — no

@@ -201,4 +201,51 @@ describe("validateCreateGoalInput", () => {
 
     expect(result).toEqual({ ok: true });
   });
+
+  // The same safety filter that gates the AI route's own
+  // input/output and IntakeScreen's client-side UI must also gate this
+  // Server Action directly — it is the actual, only mutation boundary for
+  // canonical goals/anchors, reachable regardless of what the client sent.
+  describe("safety validation", () => {
+    it("rejects an unsafe title even though it passes length/shape checks", () => {
+      const result = validateCreateGoalInput(baseGoalInput({ title: "kill someone tonight" }));
+
+      expect(result.ok).toBe(false);
+    });
+
+    it("rejects an unsafe why", () => {
+      const result = validateCreateGoalInput(baseGoalInput({ why: "so I can hurt someone" }));
+
+      expect(result.ok).toBe(false);
+    });
+
+    it("rejects an unsafe initialStruggle", () => {
+      const result = validateCreateGoalInput(
+        baseGoalInput({ initialStruggle: "I want to stalk someone" })
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it("rejects an unsafe anchor text, even when every shape/length check passes", () => {
+      const result = validateCreateGoalInput(
+        baseGoalInput({
+          anchors: [{ text: "hack their account tonight", source: "USER", position: 1 }],
+        })
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it("still accepts ordinary, benign goal/anchor text that merely contains a figurative-idiom word", () => {
+      const result = validateCreateGoalInput(
+        baseGoalInput({
+          title: "kill it at my interview",
+          anchors: [{ text: "shoot for one small win", source: "USER", position: 1 }],
+        })
+      );
+
+      expect(result).toEqual({ ok: true });
+    });
+  });
 });

@@ -1,8 +1,7 @@
 // Shared KV-only operational cleanup for a Device's push delivery state.
 // Extracted from src/app/api/cron/push/route.ts's terminal-subscription
-// cleanup (Phase 4D hardening §4) so the same logic is reusable by the
-// authenticated sign-out cleanup path (Phase 4D final hardening §5)
-// without duplicating it. Touches KV only — canonical PostgreSQL
+// cleanup so the authenticated sign-out path can reuse it without
+// duplication. Touches KV only; canonical PostgreSQL
 // PushSubscription deletion is a separate, caller-owned step (the cron
 // route uses the privileged admin client; the authenticated sign-out route
 // uses the normal RLS-scoped client — see
@@ -13,17 +12,15 @@
 // a no-op in a Redis-compatible store, so calling this twice for the same
 // device is safe.
 //
-// `strict` (Phase 4G): the job-removal steps below were originally written
-// best-effort-only (job zset lookup and each per-job removal swallow their
-// own errors) because this helper's only prior callers — cron cleanup and
-// sign-out — must never let a KV hiccup block their own unrelated job
+// By default, the job-removal steps below are best effort: job zset lookup
+// and each per-job removal swallow their own errors because cron cleanup and
+// sign-out must never let a KV hiccup block their own unrelated job
 // (draining due jobs, letting the user leave their session). Account
-// deletion has the opposite requirement (AGENTS.md Phase 4G): it must not
+// deletion has the opposite requirement: it must not
 // proceed to the irreversible auth.users delete while believing cleanup
 // succeeded when it didn't. `strict: true` lets a Device's zset lookup or
-// job removal failure propagate instead of being swallowed, without
-// changing the default (non-strict) behavior cron/sign-out already depend
-// on.
+// job removal failure propagate instead of being swallowed. Cron and
+// sign-out retain the non-strict default.
 
 import { getKvClient } from "@/lib/kv";
 import { DEVICES_SET_KEY, removeJobForDevice } from "@/lib/jobs";
@@ -47,12 +44,24 @@ export type CleanupOperationalPushStateOptions = {
 export async function cleanupOperationalPushState(
   deviceId: string,
   options: CleanupOperationalPushStateOptions = {}
-): Promise<{ cleanedJobs: number }> {
+): Promise<{ cleanedJobs: number; jobCleanupComplete: boolean }> {
   const kv = getKvClient();
   const strict = options.strict ?? false;
 
-  const zsetLookup = kv.zrange(DEVICE_JOBS_ZSET_KEY(deviceId), 0, -1);
-  const zsetJobIds = (await (strict ? zsetLookup : zsetLookup.catch(() => []))) as string[];
+  let zsetJobIds: string[] = [];
+  // Tracks whether job cleanup for this pass is
+  // fully confirmed, not just attempted. In strict mode this is moot — any
+  // failure throws immediately below, so the code that reads this flag is
+  // never reached. In non-strict mode, this is what the final device-set
+  // removal below is gated on (see that step's own comment for why).
+  let jobCleanupComplete = true;
+
+  try {
+    zsetJobIds = (await kv.zrange(DEVICE_JOBS_ZSET_KEY(deviceId), 0, -1)) as string[];
+  } catch (error) {
+    if (strict) throw error;
+    jobCleanupComplete = false;
+  }
 
   const uniqueJobIds = Array.from(
     new Set([...(options.additionalJobIds ?? []), ...(zsetJobIds ?? [])])
@@ -61,14 +70,31 @@ export async function cleanupOperationalPushState(
   let cleanedJobs = 0;
 
   for (const jobId of uniqueJobIds) {
-    const removal = removeJobForDevice(deviceId, jobId);
-    await (strict ? removal : removal.catch(() => {}));
-    cleanedJobs++;
+    try {
+      await removeJobForDevice(deviceId, jobId);
+      cleanedJobs++;
+    } catch (error) {
+      if (strict) throw error;
+      jobCleanupComplete = false;
+    }
   }
 
   await kv.del(SUB_KEY(deviceId));
-  await kv.srem(DEVICES_SET_KEY, deviceId);
   await kv.del(DAILY_START_POINTER_KEY(deviceId));
 
-  return { cleanedJobs };
+  // Only drop the device from the discovery index once job cleanup for
+  // this pass is confirmed complete. Every path that can ever rediscover and
+  // clean up leftover job state — cron's own periodic drain, and both
+  // scripts/cleanup-*.mjs maintenance scripts — enumerates devices
+  // exclusively through this same DEVICES_SET_KEY set, never through a raw
+  // key scan. Removing the device here despite an unconfirmed job-cleanup
+  // failure would permanently strand any leftover job/zset state: nothing
+  // in this codebase would ever enumerate that device again to retry. A
+  // device left in the set costs nothing beyond being revisited (and
+  // idempotently re-cleaned) by a future pass.
+  if (jobCleanupComplete) {
+    await kv.srem(DEVICES_SET_KEY, deviceId);
+  }
+
+  return { cleanedJobs, jobCleanupComplete };
 }

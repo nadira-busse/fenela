@@ -10,7 +10,7 @@ const { resolveWeeklyReflection } = await import("./resolveWeeklyReflection");
 
 const NOW = new Date("2026-08-24T12:00:00.000Z");
 
-// Same untrusted-input-boundary regression coverage as
+// Matches the untrusted-input-boundary coverage in
 // createReflectionForPeriod.test.ts: this Server Action takes no arguments
 // at all, so there is nothing a caller can inject — proves the period is
 // always derived from "now" at call time, pinned here via fake timers.

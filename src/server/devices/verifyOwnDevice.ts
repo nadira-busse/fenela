@@ -1,5 +1,5 @@
-// Read-only Device ownership check for an authenticated user (Phase 4D
-// §9/§15), used by reminder scheduling/cancellation routes. Unlike
+// Read-only Device ownership check for an authenticated user, used by
+// reminder scheduling/cancellation routes. Unlike
 // getOrCreateOwnDevice, this never creates a Device: a caller-supplied
 // deviceId that does not belong to the authenticated user must be
 // rejected outright, not silently upgraded into a new device with no

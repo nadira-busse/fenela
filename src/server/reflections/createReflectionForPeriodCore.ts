@@ -1,6 +1,5 @@
 // Trusted internal implementation for deterministic Reflection creation
-// (Phase 4E §16, ADR-005; Phase 4E hardening — closes the untrusted
-// period boundary). NOT a Server Action (no "use server" directive) and
+// (ADR-005). NOT a Server Action (no "use server" directive) and
 // therefore NOT reachable from client code — the only public,
 // client-callable entry point is
 // src/server/reflections/createReflectionForPeriod.ts, which always
@@ -19,12 +18,12 @@
 // integration testing possible — it is the public wrapper's job to
 // enforce "always now," not this function's.
 //
-// Write boundary (§17): supabase/migrations/20260809120000_mvp2_persistence_foundation.sql
+// Write boundary: supabase/migrations/20260809120000_mvp2_persistence_foundation.sql
 // grants `authenticated` SELECT-only on `reflections` — its own comment
 // documents that writes are expected "through trusted server-side
 // application code using the service_role key," anticipating exactly this
 // boundary. This reuses the existing privileged admin client
-// (src/lib/supabase/adminClient.ts, introduced in Phase 4D for an
+// (src/lib/supabase/adminClient.ts, shared with an
 // unrelated narrow cleanup job) rather than adding a new SECURITY DEFINER
 // RPC, per that already-documented, already-accepted plan. The admin
 // client is used for exactly one statement (the INSERT); event history is
@@ -34,7 +33,7 @@
 // privileged client's actual surface to the one operation `authenticated`
 // truly cannot perform itself.
 //
-// Idempotency (§18): reflections_period_unique (user_id, reflection_type,
+// Idempotency: reflections_period_unique (user_id, reflection_type,
 // period_start, period_end) is the actual invariant. A retried request for
 // the same period hits that constraint (Postgres 23505) rather than
 // inserting a duplicate; this boundary treats that as success and returns
@@ -124,7 +123,7 @@ export async function createReflectionForPeriodCore(
   // Defensive: every authenticated user who has completed screening has a
   // user_preferences row (see src/app/components/ScreeningScreen.tsx) —
   // this should be unreachable in practice, but a missing canonical
-  // timezone must fail closed rather than guess one (§6).
+  // timezone must fail closed rather than guess one.
   if (!preference) {
     return {
       ok: false,
@@ -174,7 +173,7 @@ export async function createReflectionForPeriodCore(
   if (insertError?.code === "23505") {
     // Same logical period requested again: return the existing stable
     // historical record rather than creating a duplicate or overwriting
-    // it (§18). Re-read through the normal RLS-scoped client — reflections
+    // it. Re-read through the normal RLS-scoped client; reflections
     // already grants authenticated SELECT-own.
     const supabase = await createSupabaseServerClient();
 

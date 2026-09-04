@@ -112,7 +112,7 @@ const ZSET_KEY = (id) => `push:jobs:${id}:zset`;
 const JOB_KEY = (deviceId, jobId) => `push:job:${deviceId}:${jobId}`;
 const DAILY_POINTER_KEY = (id) => `push:dailyStart:jobId:${id}`;
 
-// Legacy cleanup only. Fenéla MVP1 no longer uses the primary subscription key in active reminder delivery.
+// Legacy cleanup only. Active reminder delivery no longer uses the primary subscription key.
 const PRIMARY_SUB_KEY = "push:sub:primary";
 const LEGACY_ZSET_KEY = "push:jobs:zset";
 const LEGACY_JOB_KEY = (jobId) => `push:job:${jobId}`;

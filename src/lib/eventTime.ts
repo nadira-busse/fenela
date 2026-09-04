@@ -1,5 +1,6 @@
-// Derives trustworthy time metadata for ActionEvent/FrictionEvent rows
-// (Phase 4C §6). Framework-free and pure so the timezone-boundary behavior
+// Derives trustworthy time metadata for ActionEvent/FrictionEvent rows from
+// the user's canonical timezone. Framework-free and pure so the
+// timezone-boundary behavior
 // is unit-testable without a Supabase boundary. Mirrors src/lib/storage.ts's
 // getTodayKey() en-CA formatting approach, generalized to an arbitrary
 // IANA zone and instant instead of the hardcoded Amsterdam/"now" pair,

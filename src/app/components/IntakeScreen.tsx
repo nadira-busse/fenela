@@ -162,7 +162,7 @@ async function generateAnchorsClient(payload: {
   }
 
   // Provenance traced from the API's own response-level `source`, not
-  // guessed from text (Phase 4B §6) — every anchor in one response shares
+  // guessed from text. Every anchor in one response shares
   // it, since a single call is either a genuine AI generation or a
   // deterministic/fallback one, never a mix.
   const anchorSource = mapApiSourceToAnchorSource(data?.source ?? "fallback");
@@ -450,8 +450,8 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
       if (submitting) return;
 
       // Compatibility state (careAnchors/fenela:intake/dayState) is written
-      // by the caller only after onComplete's persistence result is known
-      // (Phase 4B hardening, Defect C) — not here, before that result exists.
+      // by the caller only after onComplete's persistence result is known,
+      // not here before that result exists.
       const trimmedGoalWhy = goalWhy.trim();
 
       setSubmitting(true);

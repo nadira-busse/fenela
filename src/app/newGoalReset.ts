@@ -1,4 +1,4 @@
-// Orchestrates "New Goal" (Phase 4B hardening, Defect B): archive the
+// Orchestrates "New Goal": archive the
 // current ACTIVE goal in PostgreSQL, and only clear local Goal-related
 // state if that succeeds. Extracted from src/app/HomeClient.tsx so this
 // ordering — and specifically that local state is left completely
@@ -30,7 +30,7 @@ export async function performNewGoalReset(
   }
 
   // Only reached when archiving succeeded (or there was no authenticated
-  // user to archive for, i.e. the unauthenticated/local-only MVP1 path) —
+  // user to archive for, i.e. the unauthenticated local-only path);
   // local intake/careAnchors/day-state are never cleared before this.
   deps.clearLocalGoalState();
 

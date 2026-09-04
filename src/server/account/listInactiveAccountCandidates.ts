@@ -1,5 +1,5 @@
-// Privileged, server-only enumeration of retention-expired Auth users
-// (Phase 4H, hardened). Finds *who* is eligible for the 12-month
+// Privileged, server-only enumeration of retention-expired Auth users.
+// Finds who is eligible for the 12-month
 // inactivity retention policy; it never deletes anything itself — see
 // runAccountRetentionBatch.ts for the step that hands each candidate to
 // the existing canonical deletion core.
@@ -31,14 +31,14 @@
 // gets no grant on it whatsoever, precisely so this destructive decision
 // never depends on a client-writable timestamp).
 //
-// Bounded batch, not a queueing platform (Phase 4H §4/§7): Admin user
+// Bounded batch, not a queueing platform: Admin user
 // listing is paginated, and this walks every page sequentially within one
 // invocation, capped by RETENTION_SCAN_MAX_PAGES so a corrupted/looping
 // pagination response — or an unexpectedly large user base — cannot make a
 // single retention run take unbounded time. If the cap is hit before the
 // last page is reached, the remaining pages are NOT silently skipped: the
 // result reports `truncated: true` so the caller/report can surface that
-// explicitly rather than assuming full coverage. For MVP2's expected scale
+// explicitly rather than assuming full coverage. At the expected scale
 // this cap (50 pages x 200 users = 10,000 accounts scanned per run) is far
 // beyond the real user count; if the product ever needs more, that is a
 // deliberate, visible future change to these constants, not a silent
@@ -133,4 +133,43 @@ export async function listInactiveAccountCandidates(
 
   // Hit RETENTION_SCAN_MAX_PAGES with more pages still remaining.
   return { candidateUserIds, scanned, truncated: true };
+}
+
+// Final eligibility recheck for exactly one candidate, immediately before
+// the irreversible delete call, closing the TOCTOU
+// window between candidate selection above and deleteAccountForUser()
+// actually running: a candidate can sign in or make an authenticated
+// request in between, and this repository's own scheduler is an external
+// HTTP caller (cron-job.org) whose overlap/duplicate-request behavior this
+// code must not depend on).
+//
+// Re-reads both activity signals fresh, right before use — never trusts the
+// scan-time snapshot in InactiveAccountCandidates for the actual deletion
+// decision. Reuses the exact same building blocks the scan above uses
+// (fetchLastActiveAtByUserId, isInactiveAccountExpired) so the recheck and
+// the scan can never silently drift into different eligibility rules;
+// admin.auth.admin.getUserById() is the one genuinely new call this
+// function needs, since the scan only ever reads last_sign_in_at through
+// the paginated listUsers() response, never for a single id.
+//
+// Deliberately throws (rather than returning a boolean-with-unclear-default)
+// on any read failure — the caller (runAccountRetentionBatch) is expected to
+// treat that as "could not confirm eligibility" and fail closed, exactly as
+// listInactiveAccountCandidates itself already does for its own reads.
+export async function isAccountStillExpired(
+  userId: string,
+  referenceInstant: Date
+): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+
+  if (error) {
+    throw new Error(`Failed to re-read Auth user for retention recheck: ${error.message}`);
+  }
+
+  const lastActiveAtByUserId = await fetchLastActiveAtByUserId(supabase, [userId]);
+  const lastActiveAt = lastActiveAtByUserId.get(userId) ?? null;
+
+  return isInactiveAccountExpired(data.user.last_sign_in_at, lastActiveAt, referenceInstant);
 }

@@ -1,7 +1,7 @@
 "use server";
 
 // Public-facing mutation boundary for archiving the caller's current ACTIVE
-// goal ("New Goal", Phase 4B §15). A single UPDATE statement is already
+// goal ("New Goal"). A single UPDATE statement is already
 // atomic in PostgreSQL — no RPC needed here, unlike goal+anchor creation.
 // Ownership comes from requireUser() + the existing goals_update_own RLS
 // policy (user_id = auth.uid()); no caller-supplied user_id is ever

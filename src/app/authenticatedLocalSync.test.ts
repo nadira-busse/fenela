@@ -6,9 +6,8 @@ import type { ActiveGoalWithAnchors } from "@/lib/goalMapping";
 // src/lib/storage.ts checks `typeof window` and calls the bare `localStorage`
 // global; src/lib/screeningStorage.ts calls `window.localStorage` directly.
 // Faking both globals against one shared in-memory Map exercises the real
-// modules together (no jsdom, no module mocking) — this is the compound
-// "reset, then repopulate from DB" transition the hardening task asks to
-// have proven, not just inspected.
+// modules together (no jsdom, no module mocking) and verifies the compound
+// "reset, then repopulate from DB" transition directly.
 function createFakeLocalStorage() {
   const store = new Map<string, string>();
   return {
@@ -90,7 +89,7 @@ describe("syncAuthenticatedLocalState", () => {
     expect(fakeLocalStorage._store.has(LS_SCREENING_DONE_KEY)).toBe(false);
   });
 
-  it("uses the canonical DB reminder preference for dailyReminder/startTime, not a stale local-only value (Phase 4D, ADR-004)", () => {
+  it("uses the canonical DB reminder preference for dailyReminder/startTime, not a stale local-only value", () => {
     fakeLocalStorage._store.set(OWNER_MARKER_KEY, JSON.stringify(USER_A));
     fakeLocalStorage._store.set(
       "fenela:screening:v1",
@@ -120,7 +119,7 @@ describe("syncAuthenticatedLocalState", () => {
     expect(screening.startTime).toBe("09:30"); // from the canonical reminder preference, not the stale local "07:15"
   });
 
-  it("defaults dailyReminder/startTime when no reminder preference row exists yet, ignoring any stale local value (Phase 4D §25)", () => {
+  it("defaults dailyReminder/startTime when no reminder preference row exists yet, ignoring any stale local value", () => {
     fakeLocalStorage._store.set(OWNER_MARKER_KEY, JSON.stringify(USER_A));
     fakeLocalStorage._store.set(
       "fenela:screening:v1",

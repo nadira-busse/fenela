@@ -15,7 +15,7 @@ export function parseHHMM(hhmm: string): { h: number; m: number } | null {
   return { h, m };
 }
 
-// General IANA-timezone-aware wall-clock <-> UTC helpers (Phase 4D §8):
+// General IANA-timezone-aware wall-clock <-> UTC helpers:
 // getAmsterdamParts/amsterdamWallTimeToUtcMs/nextAmsterdamOccurrenceMs below
 // are unchanged, Amsterdam-specific wrappers around these — kept for the
 // existing unauthenticated/legacy call sites, so generalizing this module

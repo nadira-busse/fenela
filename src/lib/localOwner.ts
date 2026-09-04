@@ -1,9 +1,9 @@
-// Ties MVP1 local compatibility state to the authenticated user it belongs
+// Ties local compatibility state to the authenticated user it belongs
 // to, so a different authenticated user in the same browser profile can
-// never inherit it, and old ownerless/pre-auth local state is never
-// silently adopted by the first authenticated user (Phase 4A hardening,
-// Defect A). Temporary compatibility infrastructure only — `user_preferences`
-// remains the canonical source for authenticated screening state (ADR-003).
+// never inherit it, and ownerless/pre-auth local state is never silently
+// adopted by the first authenticated user. This is temporary compatibility
+// infrastructure only; `user_preferences` remains the canonical source for
+// authenticated screening state (ADR-003).
 //
 // ensureLocalOwnership() deliberately does not touch:
 // - the DB-derived screening cache logic itself (src/app/HomeClient.tsx
@@ -14,8 +14,8 @@
 //   just add logout cleanup.
 //
 // clearLocalStateForSignOut() below is a separate, explicitly-triggered
-// function for actual sign-out (Phase 4D final hardening §10/§11) — it
-// intentionally clears more than ensureLocalOwnership does, including the
+// function for actual sign-out. It intentionally clears more than
+// ensureLocalOwnership does, including the
 // owner marker and the device/reminder-local cache, since a signed-out
 // browser should not carry forward the previous account's device identity
 // or Goal/Anchor state at all.
@@ -26,7 +26,7 @@ import { DAILY_REMINDER_TIME_KEY, DAILY_REMINDERS_ENABLED_KEY } from "@/lib/remi
 
 export const OWNER_MARKER_KEY = "fenela:localOwnerUserId";
 
-// Personal, post-screening MVP1 product state that must not leak between
+// Personal, post-screening compatibility state that must not leak between
 // authenticated users sharing a browser profile.
 export const OWNED_STORAGE_KEYS = [
   "fenela:screening:v1",
@@ -35,7 +35,7 @@ export const OWNED_STORAGE_KEYS = [
   "dayStateV3",
   "careAnchors",
   "anchor:dayState",
-  // Phase 4F: which weekly Reflection this device has already shown — see
+  // Which weekly Reflection this device has already shown; see
   // src/app/reflections/weeklyReflectionLocalState.ts.
   "fenela:reflection:weekly:lastSeenId",
 ] as const;
@@ -76,7 +76,7 @@ export function ensureLocalOwnership(userId: string): void {
 }
 
 /**
- * Explicit authenticated sign-out cleanup (Phase 4D final hardening) —
+ * Explicit authenticated sign-out cleanup:
  * distinct from ensureLocalOwnership's cross-account load protection.
  * Removes every owned personal-compatibility key, the owner marker
  * itself, and this browser's device/reminder-local cache, so:

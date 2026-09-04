@@ -53,6 +53,19 @@ describe("deleteOwnAccountAction", () => {
     expect(deleteAccountForUser).not.toHaveBeenCalled();
   });
 
+  it("returns UNAUTHENTICATED without rethrowing when a deleted identity still has a stale session", async () => {
+    requireUser.mockRejectedValue(new UnauthenticatedError("No authenticated user."));
+
+    const result = await deleteOwnAccountAction();
+
+    expect(result).toEqual({
+      ok: false,
+      error: "UNAUTHENTICATED",
+      message: "Your session expired. Please sign in again.",
+    });
+    expect(deleteAccountForUser).not.toHaveBeenCalled();
+  });
+
   it("fails closed on an Auth verification/infrastructure error rather than the deletion core running", async () => {
     requireUser.mockRejectedValue(new AuthVerificationError("Auth service unavailable"));
 

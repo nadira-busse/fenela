@@ -1,6 +1,6 @@
 "use server";
 
-// Public-facing, client-callable Server Action boundary for the Phase 4F
+// Public-facing, client-callable Server Action boundary for the
 // weekly reflection product flow. Takes no input at all — there is nothing
 // for a caller to supply: the eligible period is always "the previous
 // completed week as of right now," derived server-side from `new Date()`

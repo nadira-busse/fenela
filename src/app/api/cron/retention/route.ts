@@ -1,5 +1,5 @@
 // System-to-system entry point for the 12-month inactivity retention
-// policy (Phase 4H). Consistent with the existing secured cron
+// policy. Consistent with the existing secured cron
 // architecture (src/app/api/cron/push/route.ts): protected by the same
 // CRON_SECRET Bearer-token boundary (src/lib/cronAuth.ts), not by an
 // authenticated user session — this must never accept requireUser()-based
@@ -8,7 +8,7 @@
 //
 // This route contains no retention/deletion logic of its own. It only
 // authorizes the request and delegates to runAccountRetentionBatch(), the
-// same batch runner that reuses Phase 4G's canonical deleteAccountForUser()
+// same batch runner that reuses the canonical deleteAccountForUser()
 // for every expired account. See that module's header for batch failure
 // isolation semantics.
 //

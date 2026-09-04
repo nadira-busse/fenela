@@ -1,8 +1,7 @@
 // Mapping and validation for the canonical `reminder_preferences` table
-// (Phase 4D, ADR-004) — the single source of truth for an authenticated
-// user's reminder enabled/start_time choice, replacing the two previously
-// independent local sources (screening's onboarding value and Coaching's
-// settings value). Framework-free and pure so it can be unit-tested
+// (ADR-004), the single source of truth for an authenticated user's reminder
+// enabled/start_time choice. Screening and Coaching settings do not maintain
+// independent sources. Framework-free and pure so it can be unit-tested
 // without a Supabase boundary, matching src/lib/userPreferenceMapping.ts's
 // precedent.
 
@@ -19,7 +18,7 @@ export type SaveReminderPreferenceInput = {
   startTime: string;
 };
 
-// Server-boundary validation (AGENTS.md §12): runs regardless of what the
+// Server-boundary validation runs regardless of what the
 // caller's TypeScript types claim, since the Server Action calling this is
 // reachable as a plain POST endpoint.
 export function validateSaveReminderPreferenceInput(

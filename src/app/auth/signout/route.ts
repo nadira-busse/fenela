@@ -1,4 +1,4 @@
-// Final step of the sign-out lifecycle (Phase 4D final hardening §8):
+// Final step of the sign-out lifecycle:
 // clears the Supabase session so requireUser() fails closed afterward.
 // Device/push detachment and personal local-state cleanup happen before
 // this is called — see src/app/auth/SignOutButton.tsx, which is the only

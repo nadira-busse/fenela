@@ -121,13 +121,13 @@ Fenéla uses passwordless Magic Link authentication.
 
 Enter your email address on the sign-in screen and use the link sent to that address to complete authentication.
 
-The current hosted portfolio deployment uses Supabase's built-in authentication email delivery. That service is rate-limited.
+The hosted deployment uses Supabase's built-in authentication email delivery. That service is rate-limited.
 
 During repeated testing, requesting several Magic Links within a short period can therefore produce a temporary `429 Too Many Requests` response.
 
 This does not necessarily indicate that the account or application is broken. Wait before requesting another link.
 
-The current hosted deployment accepts this limitation rather than adding a dedicated SMTP service, because Fenéla is operated primarily as a personal application and public portfolio deployment rather than a high-volume public SaaS service.
+The hosted deployment accepts this limitation rather than adding a dedicated SMTP service because Fenéla is not operated as a high-volume public SaaS service.
 
 ## Account settings
 
@@ -147,9 +147,9 @@ Fenéla's core accountability flow does not depend on push notifications.
 
 Reminder delivery relies on external browser, operating-system, push-provider and scheduling infrastructure.
 
-Fenéla handles known terminal subscription failures and performs one bounded retry for a one-shot task reminder after a transient push-delivery failure.
+Fenéla handles known terminal subscription failures. A one-shot task reminder is claimed before delivery and Fenéla makes at most one application-level send attempt for that logical reminder. It is not automatically resent after an ambiguous provider failure.
 
-A reminder can therefore still fail to arrive under external failure conditions. This does not prevent the app itself from being used.
+A reminder can therefore fail to arrive under external failure conditions. This does not prevent the app itself from being used.
 
 ## Privacy
 

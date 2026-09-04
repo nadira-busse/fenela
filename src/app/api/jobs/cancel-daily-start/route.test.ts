@@ -98,4 +98,75 @@ describe("POST /api/jobs/cancel-daily-start", () => {
     expect(removeJobForDevice).toHaveBeenCalledWith("device-a", "pointer-job-id");
     expect(kvDel).toHaveBeenCalledWith("push:dailyStart:jobId:device-a");
   });
+
+  it("own device, no pointer/job currently scheduled: still succeeds and clears whatever pointer key exists", async () => {
+    kvGet.mockResolvedValue(null);
+
+    const response = await POST(makeRequest({ deviceId: "device-a" }) as unknown as Request);
+    const data = await response.json();
+
+    expect(data).toEqual({
+      ok: true,
+      disabled: true,
+      deviceId: "device-a",
+      cancelledJobId: null,
+    });
+    expect(removeJobForDevice).not.toHaveBeenCalled();
+    expect(kvDel).toHaveBeenCalledWith("push:dailyStart:jobId:device-a");
+  });
+
+  describe("job-removal failure preserves the DAILY_START pointer", () => {
+    it("reports failure rather than success, and does NOT delete the pointer, when removeJobForDevice fails", async () => {
+      removeJobForDevice.mockRejectedValue(new Error("kv unavailable"));
+
+      const response = await POST(makeRequest({ deviceId: "device-a" }) as unknown as Request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.ok).toBe(false);
+      expect(data.error).toBe("kv unavailable");
+      // The pointer must remain when job removal fails so cron's own
+      // pointer-mismatch guard continues protecting the live job.
+      expect(kvDel).not.toHaveBeenCalled();
+    });
+
+    it("a retry after a failed cancellation finds the same pointer/job and can complete cleanly", async () => {
+      removeJobForDevice.mockRejectedValueOnce(new Error("kv unavailable"));
+
+      const first = await POST(makeRequest({ deviceId: "device-a" }) as unknown as Request);
+      expect(first.status).toBe(500);
+      expect(kvDel).not.toHaveBeenCalled();
+
+      // kv.get still returns the same pointer — nothing was torn down by
+      // the failed attempt, so the retry sees the exact same state.
+      removeJobForDevice.mockResolvedValue(undefined);
+
+      const retry = await POST(makeRequest({ deviceId: "device-a" }) as unknown as Request);
+      const retryData = await retry.json();
+
+      expect(retryData).toEqual({
+        ok: true,
+        disabled: true,
+        deviceId: "device-a",
+        cancelledJobId: "pointer-job-id",
+      });
+      expect(removeJobForDevice).toHaveBeenCalledTimes(2);
+      expect(removeJobForDevice).toHaveBeenNthCalledWith(2, "device-a", "pointer-job-id");
+      expect(kvDel).toHaveBeenCalledWith("push:dailyStart:jobId:device-a");
+    });
+
+    it("a non-Error rejection still produces a controlled failure response", async () => {
+      removeJobForDevice.mockRejectedValue("not an Error instance");
+
+      const response = await POST(makeRequest({ deviceId: "device-a" }) as unknown as Request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data).toEqual({
+        ok: false,
+        error: "Could not fully cancel the daily reminder. Please try again.",
+      });
+      expect(kvDel).not.toHaveBeenCalled();
+    });
+  });
 });

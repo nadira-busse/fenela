@@ -151,4 +151,159 @@ describe("deleteAccountForUser", () => {
     expect(cleanupOperationalPushState).toHaveBeenCalledTimes(3);
     expect(deleteAuthUserById).toHaveBeenCalledTimes(1);
   });
+
+  describe("preAuthDeletionGuard at the final race-window boundary", () => {
+    it("without a guard supplied, behaves exactly as before — this is what user-initiated deletion (deleteOwnAccountAction) relies on", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+
+      const result = await deleteAccountForUser("user-1");
+
+      expect(result).toEqual({ ok: true });
+      expect(deleteAuthUserById).toHaveBeenCalledWith("user-1");
+    });
+
+    it("proves the real call ordering: device enumeration, then every device's cleanup, then the guard, then auth deletion — not a mocked sequence", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a", "device-b"]);
+
+      const order: string[] = [];
+      listDeviceIdsForUser.mockImplementation(async () => {
+        order.push("enumeration");
+        return ["device-a", "device-b"];
+      });
+      cleanupOperationalPushState.mockImplementation(async (deviceId: string) => {
+        order.push(`cleanup:${deviceId}`);
+        return { cleanedJobs: 0 };
+      });
+      const guard = vi.fn(async () => {
+        order.push("guard");
+        return true;
+      });
+      deleteAuthUserById.mockImplementation(async () => {
+        order.push("auth-delete");
+        return { ok: true };
+      });
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({ ok: true });
+      expect(order).toEqual([
+        "enumeration",
+        "cleanup:device-a",
+        "cleanup:device-b",
+        "guard",
+        "auth-delete",
+      ]);
+      expect(guard).toHaveBeenCalledTimes(1);
+    });
+
+    it("cancels deletion when the guard returns false — auth deletion is never reached, and cleanup that already ran is not undone or retried", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+      const guard = vi.fn().mockResolvedValue(false);
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({
+        ok: false,
+        cancelled: true,
+        reason: "The pre-deletion guard determined this account should no longer be deleted.",
+      });
+      // Cleanup for the one owned device already ran exactly once — this is
+      // the accepted bounded degradation documented on
+      // DeleteAccountOptions.preAuthDeletionGuard, not a bug: the point of
+      // this test is to make that real, observable behavior explicit.
+      expect(cleanupOperationalPushState).toHaveBeenCalledTimes(1);
+      expect(deleteAuthUserById).not.toHaveBeenCalled();
+    });
+
+    it("cancels deletion for a user with zero owned devices before any cleanup would even be needed", async () => {
+      listDeviceIdsForUser.mockResolvedValue([]);
+      const guard = vi.fn().mockResolvedValue(false);
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({
+        ok: false,
+        cancelled: true,
+        reason: "The pre-deletion guard determined this account should no longer be deleted.",
+      });
+      expect(cleanupOperationalPushState).not.toHaveBeenCalled();
+      expect(deleteAuthUserById).not.toHaveBeenCalled();
+    });
+
+    it("fails closed as stage 'pre_deletion_guard' when the guard itself throws — auth deletion is never reached", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+      const guard = vi.fn().mockRejectedValue(new Error("could not re-verify eligibility"));
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({
+        ok: false,
+        stage: "pre_deletion_guard",
+        message: "could not re-verify eligibility",
+      });
+      expect(deleteAuthUserById).not.toHaveBeenCalled();
+    });
+
+    it("fails closed with a controlled message when the guard rejects with a non-Error value", async () => {
+      listDeviceIdsForUser.mockResolvedValue([]);
+      const guard = vi.fn().mockRejectedValue("not an Error instance");
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({
+        ok: false,
+        stage: "pre_deletion_guard",
+        message: "Pre-deletion guard check failed.",
+      });
+      expect(deleteAuthUserById).not.toHaveBeenCalled();
+    });
+
+    it("proceeds to auth deletion exactly once when the guard returns true", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+      const guard = vi.fn().mockResolvedValue(true);
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({ ok: true });
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(deleteAuthUserById).toHaveBeenCalledTimes(1);
+      expect(deleteAuthUserById).toHaveBeenCalledWith("user-1");
+    });
+
+    it("still fails closed at operational_cleanup before the guard is ever reached, if cleanup itself fails first", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+      cleanupOperationalPushState.mockRejectedValue(new Error("kv unavailable"));
+      const guard = vi.fn().mockResolvedValue(true);
+
+      const result = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+
+      expect(result).toEqual({
+        ok: false,
+        stage: "operational_cleanup",
+        message: "kv unavailable",
+      });
+      expect(guard).not.toHaveBeenCalled();
+      expect(deleteAuthUserById).not.toHaveBeenCalled();
+    });
+
+    it("retry after a guard cancellation is safe and idempotent — a second attempt where the guard now returns true completes deletion normally", async () => {
+      listDeviceIdsForUser.mockResolvedValue(["device-a"]);
+      const guard = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      const first = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+      expect(first).toEqual({
+        ok: false,
+        cancelled: true,
+        reason: "The pre-deletion guard determined this account should no longer be deleted.",
+      });
+
+      const second = await deleteAccountForUser("user-1", { preAuthDeletionGuard: guard });
+      expect(second).toEqual({ ok: true });
+      // Re-running cleanup for the same device twice is safe/idempotent —
+      // already covered by cleanupOperationalPushState's own tests; this
+      // test's own concern is only that the retry reaches a normal
+      // completion, not a stuck or corrupted state.
+      expect(deleteAuthUserById).toHaveBeenCalledTimes(1);
+    });
+  });
 });

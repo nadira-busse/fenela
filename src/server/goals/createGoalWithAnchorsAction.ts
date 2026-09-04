@@ -1,7 +1,7 @@
 "use server";
 
-// Public-facing mutation boundary for creating a Goal + its Anchors
-// (Phase 4B). Treated like any public endpoint: authenticates and
+// Public-facing mutation boundary for creating a Goal + its Anchors.
+// Treated like any public endpoint: authenticates and
 // validates on the server, does not trust a caller-supplied user_id.
 //
 // Atomicity: delegates to the create_active_goal_with_anchors PostgreSQL

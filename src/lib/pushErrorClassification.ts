@@ -1,5 +1,4 @@
-// Classifies a rejected web-push sendNotification() error (Phase 4D
-// hardening §4) into:
+// Classifies a rejected web-push sendNotification() error into:
 //
 //   TERMINAL_INVALID_SUBSCRIPTION — the push service has confirmed the
 //   endpoint no longer exists (HTTP 404/410, per web-push's own documented

@@ -40,8 +40,12 @@ Thumbs.db
 tmp/
 .cache/
 
-# Local sprint handovers
+# Local working notes
 docs-learning-private/
 
-# Local AI/agent working context
+# Local-only tooling and working context
+AGENTS.md
+
 .agent-private/
+
+.claude/

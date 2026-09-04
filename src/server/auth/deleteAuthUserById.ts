@@ -1,5 +1,5 @@
-// Privileged, server-only Auth Admin deletion for one exact user id
-// (Phase 4G). This is the actual irreversible identity deletion account
+// Privileged, server-only Auth Admin deletion for one exact user id. This
+// is the irreversible identity deletion account
 // deletion depends on — everything else in the deletion flow (operational
 // KV cleanup, PostgreSQL cascades) is either reversible-in-principle or a
 // downstream consequence of this call succeeding.

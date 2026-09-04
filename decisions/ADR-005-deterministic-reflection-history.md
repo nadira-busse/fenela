@@ -94,9 +94,7 @@ deterministic product wording
 
 The current weekly reflection is rendered from deterministic facts through fixed product wording.
 
-This is the MVP2 reflection boundary, not a decision that AI can never play a role in reflection.
-
-MVP3 will evaluate whether AI can add useful personalization or interpretation without weakening the deterministic factual foundation. Any such extension must keep recorded facts, ownership, period boundaries and factual aggregation outside the model.
+This decision defines the current reflection boundary. It does not rule out future presentation changes, but recorded facts, ownership, period boundaries and factual aggregation must remain outside any probabilistic layer.
 
 AI is not used to establish:
 
@@ -196,9 +194,7 @@ Persisting factual history also creates additional privacy responsibilities.
 
 Only fields with an explicit product purpose are stored, and their lifecycle follows the same documented ownership, account-deletion and inactivity-retention boundaries as other account-owned Fenéla data.
 
-The current MVP2 reflection wording is deliberately constrained as well. It prioritizes traceability and predictable behavior over richer personalization.
-
-MVP3 may test whether a bounded AI layer can improve the usefulness of reflections without weakening the deterministic factual foundation. That work is future scope and does not change the current MVP2 implementation.
+The current reflection wording is deliberately constrained. It prioritizes traceability and predictable behavior over richer personalization. Any future presentation layer must preserve the deterministic factual foundation.
 
 ## Impact
 

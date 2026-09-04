@@ -1,4 +1,4 @@
-// Decides whether the Phase 4F weekly reflection card should be shown on
+// Decides whether the weekly reflection card should be shown on
 // this app load, and to what. Extracted from the WeeklyReflectionGate
 // component so this decision is independently testable without rendering
 // (this repo has no RTL/jsdom dependency) — same pattern as

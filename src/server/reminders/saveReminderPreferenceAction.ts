@@ -1,7 +1,7 @@
 "use server";
 
-// Public-facing mutation boundary for `reminder_preferences` (Phase 4D,
-// ADR-004). Treated like any public endpoint: authenticates and validates
+// Public-facing mutation boundary for `reminder_preferences` (ADR-004).
+// Treated like any public endpoint: authenticates and validates
 // on the server, does not trust a caller-supplied user_id. One row per
 // authenticated user — upsert on the user_id primary key so a first save
 // creates it and a later save (from onboarding or from Coaching's

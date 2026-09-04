@@ -1,14 +1,7 @@
-// Deterministic, non-AI reflection text renderer (Phase 4E §13/§28,
-// ADR-005). Pure function of ReflectionFacts — same facts always produce
-// the exact same text, with no OpenAI/LLM call anywhere in this module.
-//
-// Downstream-replaceable by design: an optional AI renderer (Phase 4F)
-// would sit alongside this one, both consuming the same ReflectionFacts —
-// aggregation is never coupled to either renderer.
-//
-// Style constraints (deliberate, ADR-005 §13): calm, factual, brief,
-// non-judgmental. No productivity/therapeutic language, no percentages or
-// rates, no inferred meaning from friction text — only what was counted.
+// Deterministic, non-AI reflection renderer. The same ReflectionFacts always
+// produce the same text. The wording is intentionally calm, factual and brief;
+// it does not infer meaning from friction text or introduce a second source of
+// truth beside the persisted facts snapshot.
 
 import type { ReflectionFacts } from "@/lib/reflectionAggregation";
 

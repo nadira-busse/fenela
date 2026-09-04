@@ -14,7 +14,7 @@ To run Fenéla locally, install:
 - npm;
 - Docker Desktop or Podman.
 
-Docker or Podman is required for the local Supabase stack.
+Docker or Podman is required for the local Supabase stack. Start Docker Desktop or Podman and wait until its container engine is running before starting Supabase.
 
 For the full repository validation checks, also install:
 
@@ -48,7 +48,7 @@ macOS or Linux:
 cp .env.example .env.local
 ```
 
-Keep real credentials in `.env.local`. Do not commit this file.
+Keep local environment-specific values, including credentials and service URLs, in `.env.local`. Do not commit this file.
 
 ## 3. Start local Supabase
 
@@ -95,11 +95,25 @@ Use the values from `supabase status` as follows:
 
 | Supabase status field | `.env.local` variable                  |
 | --------------------- | -------------------------------------- |
-| `API_URL`             | `NEXT_PUBLIC_SUPABASE_URL`             |
-| `PUBLISHABLE_KEY`     | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
-| `SECRET_KEY`          | `SUPABASE_SECRET_KEY`                  |
+| `Project URL`         | `NEXT_PUBLIC_SUPABASE_URL`             |
+| `Publishable`         | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `Secret`              | `SUPABASE_SECRET_KEY`                  |
 
-The status output also includes `ANON_KEY` and `SERVICE_ROLE_KEY`. Fenéla uses the newer `PUBLISHABLE_KEY` and `SECRET_KEY` values instead.
+If you use locally adjusted Supabase ports, especially on Windows, verify the actual Docker host-port mappings before copying URLs into `.env.local`. In some local setups, `supabase status` can show configured ports that differ from the ports Docker is actually publishing to the host.
+
+Check the active mappings with:
+
+```powershell
+docker ps --format "table {{.Names}}\t{{.Ports}}\t{{.Status}}"
+```
+
+If supabase status and docker ps show different host ports, use the host ports published by Docker. Those are the ports actually reachable from the browser and the local Fenéla process.
+
+Use the Docker host ports for:
+
+- NEXT_PUBLIC_SUPABASE_URL;
+- Supabase Studio;
+- Mailpit.
 
 The two `NEXT_PUBLIC_` variables are browser-safe.
 
@@ -135,13 +149,15 @@ http://localhost:3000/auth
 
 Enter an email address and request a Magic Link.
 
-The local Supabase stack captures outgoing authentication email in Mailpit. Find the Mailpit URL in the `MAILPIT_URL` field of:
+The local Supabase stack captures outgoing authentication email in Mailpit. Find the Mailpit URL in the Development Tools section of:
 
 ```bash
 npx supabase@2.113.0 status
 ```
 
-Open that URL, find the email in Mailpit, and follow the Magic Link.
+If that URL is not reachable and the local Supabase ports were adjusted, use the Mailpit host port published by Docker as described in the Supabase configuration section above.
+
+Open the working Mailpit URL, find the email, and follow the Magic Link.
 
 The link returns through:
 
@@ -233,7 +249,10 @@ npm run format:check
 npm run lint
 npm run test
 npm run build
+npm run test:rls
 ```
+
+`npm run test:rls` runs the real local PostgreSQL RLS ownership suite in `supabase/tests/ownership.rls.test.ts`. It requires the local Supabase stack to be running and is not part of the default GitHub Actions workflow.
 
 For internal Markdown links:
 
@@ -396,7 +415,9 @@ Restart `npm run dev` after changing `.env.local`.
 
 Confirm that the local Supabase stack is running.
 
-Open Mailpit at the `MAILPIT_URL` shown by `npx supabase@2.113.0 status`.
+Find the Mailpit URL in the Development Tools section of `npx supabase@2.113.0 status`.
+
+If that URL is not reachable and the local Supabase ports were adjusted, use the Mailpit host port published by Docker as described in the Supabase configuration section above.
 
 Request a new Magic Link from:
 
@@ -470,6 +491,7 @@ npm run format:check
 npm run lint
 npm run test
 npm run build
+npm run test:rls
 ```
 
 and the internal Markdown link check all pass.

@@ -48,10 +48,30 @@ describe("requireUser", () => {
     await expect(requireUser()).rejects.toBeInstanceOf(UnauthenticatedError);
   });
 
-  it("does not downgrade a real Auth verification/infrastructure failure into UnauthenticatedError (Phase 4D hardening)", async () => {
+  it("does not downgrade a real Auth verification/infrastructure failure into UnauthenticatedError", async () => {
     mockGetUser({
       data: { user: null },
       error: new AuthApiError("Auth service unavailable", 500, undefined),
+    });
+
+    await expect(requireUser()).rejects.toBeInstanceOf(AuthVerificationError);
+    await expect(requireUser()).rejects.not.toBeInstanceOf(UnauthenticatedError);
+  });
+
+  it("treats a deleted identity's still-cached session as UnauthenticatedError, not AuthVerificationError", async () => {
+    mockGetUser({
+      data: { user: null },
+      error: new AuthApiError("User from sub claim in JWT does not exist", 403, "user_not_found"),
+    });
+
+    await expect(requireUser()).rejects.toBeInstanceOf(UnauthenticatedError);
+    await expect(requireUser()).rejects.not.toBeInstanceOf(AuthVerificationError);
+  });
+
+  it("still treats an AuthApiError with a different or missing code as AuthVerificationError — the user_not_found check is narrow, not a blanket downgrade of every AuthApiError", async () => {
+    mockGetUser({
+      data: { user: null },
+      error: new AuthApiError("Too many requests", 429, "over_request_rate_limit"),
     });
 
     await expect(requireUser()).rejects.toBeInstanceOf(AuthVerificationError);

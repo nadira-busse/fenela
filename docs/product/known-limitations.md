@@ -75,7 +75,7 @@ See [ADR-003: Authenticated User-Owned Persistence](../../decisions/ADR-003-auth
 
 ## Account deletion and retention
 
-Users can permanently delete their account at any time from `/auth`. Accounts inactive for 12 months or more are also permanently deleted by a scheduled job, using the same deletion mechanism. Full behavior is documented in [Privacy and data lifecycle](privacy-data-lifecycle.md).
+Users can request permanent account deletion from `/auth`. Accounts inactive for 12 months or more are also deleted by scheduled retention processing through the same deletion core. Full behavior is documented in [Privacy and data lifecycle](privacy-data-lifecycle.md).
 
 Two accepted limitations of the current implementation:
 
