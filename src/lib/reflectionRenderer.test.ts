@@ -21,6 +21,8 @@ function makeFacts(
       completedCount: 0,
       postponedCount: 0,
       parkedCount: 0,
+      completedAnchors: [],
+      notCompletedAnchors: [],
       ...overrides,
     },
     friction: {
@@ -31,7 +33,11 @@ function makeFacts(
 
 describe("renderDeterministicReflectionText", () => {
   it("is deterministic — the same facts always produce the exact same text", () => {
-    const facts = makeFacts({ activeDays: 3, completedCount: 4, postponedCount: 2 });
+    const facts = makeFacts({
+      activeDays: 3,
+      completedAnchors: ["Read for 10 minutes"],
+      notCompletedAnchors: ["Walk for 20 minutes"],
+    });
 
     expect(renderDeterministicReflectionText(facts)).toBe(renderDeterministicReflectionText(facts));
   });
@@ -44,56 +50,77 @@ describe("renderDeterministicReflectionText", () => {
     );
   });
 
-  it("renders a representative WEEKLY-shaped summary", () => {
-    const facts = makeFacts({ activeDays: 3, completedCount: 4, postponedCount: 2 }, 2);
+  it("names what was completed and what was not, concretely", () => {
+    const facts = makeFacts(
+      {
+        activeDays: 3,
+        completedCount: 4,
+        postponedCount: 2,
+        completedAnchors: ["Read for 10 minutes"],
+        notCompletedAnchors: ["Walk for 20 minutes", "Journal for 5 minutes"],
+      },
+      2
+    );
 
     expect(renderDeterministicReflectionText(facts)).toBe(
       "You came back on 3 days.\n" +
-        "You completed 4 actions and postponed 2 actions.\n" +
+        "You completed: Read for 10 minutes.\n" +
+        "You did not complete: Walk for 20 minutes and Journal for 5 minutes.\n" +
         "You noted 2 moments of friction."
     );
   });
 
-  it("renders a representative MONTHLY-shaped summary (same renderer, larger counts)", () => {
-    const facts: ReflectionFacts = {
-      period: {
-        type: "MONTHLY",
-        start: "2026-03-01",
-        end: "2026-03-31",
-        timeZone: "Europe/Amsterdam",
-      },
-      activity: {
-        activeDays: 14,
-        startedCount: 20,
-        completedCount: 16,
-        postponedCount: 5,
-        parkedCount: 2,
-      },
-      friction: { entriesCount: 3 },
-    };
+  it("omits the completed line entirely when nothing was completed", () => {
+    const facts = makeFacts({
+      activeDays: 1,
+      notCompletedAnchors: ["Walk for 20 minutes"],
+    });
 
     expect(renderDeterministicReflectionText(facts)).toBe(
-      "You came back on 14 days.\n" +
-        "You completed 16 actions and postponed 5 actions.\n" +
-        "2 anchors were parked for the day.\n" +
-        "You noted 3 moments of friction."
+      "You came back on 1 day.\nYou did not complete: Walk for 20 minutes."
+    );
+  });
+
+  it("omits the not-completed line entirely when everything touched was completed", () => {
+    const facts = makeFacts({
+      activeDays: 1,
+      completedAnchors: ["Read for 10 minutes"],
+    });
+
+    expect(renderDeterministicReflectionText(facts)).toBe(
+      "You came back on 1 day.\nYou completed: Read for 10 minutes."
+    );
+  });
+
+  it("joins three or more anchors with a trailing 'and', not just commas", () => {
+    const facts = makeFacts({
+      activeDays: 1,
+      completedAnchors: ["Read for 10 minutes", "Walk for 20 minutes", "Journal for 5 minutes"],
+    });
+
+    expect(renderDeterministicReflectionText(facts)).toBe(
+      "You came back on 1 day.\n" +
+        "You completed: Read for 10 minutes, Walk for 20 minutes, and Journal for 5 minutes."
     );
   });
 
   it("uses singular wording for count-of-one values", () => {
-    const facts = makeFacts({ activeDays: 1, completedCount: 1, parkedCount: 1 }, 1);
+    const facts = makeFacts({ activeDays: 1, completedAnchors: ["Read for 10 minutes"] }, 1);
 
     expect(renderDeterministicReflectionText(facts)).toBe(
       "You came back on 1 day.\n" +
-        "You completed 1 action.\n" +
-        "1 anchor was parked for the day.\n" +
+        "You completed: Read for 10 minutes.\n" +
         "You noted 1 moment of friction."
     );
   });
 
   it("never includes a percentage, rate, or score", () => {
     const facts = makeFacts(
-      { activeDays: 5, completedCount: 3, postponedCount: 3, parkedCount: 1 },
+      {
+        activeDays: 5,
+        completedAnchors: ["Read for 10 minutes"],
+        notCompletedAnchors: ["Walk for 20 minutes"],
+      },
       1
     );
     const text = renderDeterministicReflectionText(facts);

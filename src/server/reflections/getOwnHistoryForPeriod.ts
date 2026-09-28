@@ -8,7 +8,12 @@
 // `action_events_select_own`/`friction_events_select_own` policies
 // (anchor -> goal -> auth.uid()) are the actual authorization check, with
 // no caller-supplied user_id anywhere. Those policies carry no status
-// filter, so ARCHIVED-Goal history is included automatically.
+// filter, so ARCHIVED-Goal history is included automatically. The embedded
+// `anchors(text, position)` select below is a second, independent RLS
+// check (`anchors_select_own`, same anchor -> goal -> auth.uid() shape) —
+// PostgREST enforces RLS on the embedded table too, so this cannot surface
+// another user's anchor text even if action_events row-level ownership
+// were ever satisfied by mistake.
 //
 // Date filtering uses the stored `local_date` column directly — the
 // column the write boundary already derived specifically to represent
@@ -25,6 +30,13 @@ export type ReflectionActionEvent = {
   eventType: ActionEventType;
   localDate: string;
   occurredAt: string;
+  // anchor_id is not null in the DB (action_events.anchor_id references
+  // anchors, not-null); anchorText/anchorPosition come from the embedded
+  // anchors row, which the same-shaped RLS policy guarantees is present
+  // whenever the action_events row itself is visible.
+  anchorId: string;
+  anchorText: string;
+  anchorPosition: number;
 };
 
 export type ReflectionFrictionEvent = {
@@ -50,7 +62,7 @@ export async function getOwnHistoryForPeriod(period: {
 
   const { data: actionRows, error: actionError } = await supabase
     .from("action_events")
-    .select("event_type, local_date, occurred_at")
+    .select("event_type, local_date, occurred_at, anchor_id, anchors(text, position)")
     .gte("local_date", period.start)
     .lte("local_date", period.end)
     .order("occurred_at", { ascending: true });
@@ -58,6 +70,19 @@ export async function getOwnHistoryForPeriod(period: {
   if (actionError) {
     throw new Error(`Failed to load action_events: ${actionError.message}`);
   }
+
+  // The generated Supabase types don't model the embedded `anchors(...)`
+  // shape from a plain string select; this is the same defensive-cast
+  // pattern already used below for event_type, applied to the one
+  // additional shape PostgREST adds for the embed.
+  type ActionRowWithAnchor = {
+    event_type: string;
+    local_date: string;
+    occurred_at: string;
+    anchor_id: string;
+    anchors: { text: string; position: number } | null;
+  };
+  const typedActionRows = (actionRows ?? []) as unknown as ActionRowWithAnchor[];
 
   const { data: frictionRows, error: frictionError } = await supabase
     .from("friction_events")
@@ -74,12 +99,20 @@ export async function getOwnHistoryForPeriod(period: {
     // Defensive: the DB column is plain `text` in the generated types
     // (the CHECK constraint isn't reflected there) — an unrecognized value
     // is dropped rather than silently miscounted under the wrong bucket.
-    actionEvents: (actionRows ?? [])
-      .filter((row) => isActionEventType(row.event_type))
+    // A null embedded `anchors` row is dropped the same way: it cannot
+    // happen for genuinely own data (anchor_id is not-null and RLS
+    // ownership is identical on both tables), so treating it as
+    // unrecognized rather than fabricating placeholder text is the
+    // correct fail-closed behavior.
+    actionEvents: typedActionRows
+      .filter((row) => isActionEventType(row.event_type) && row.anchors !== null)
       .map((row) => ({
         eventType: row.event_type as ActionEventType,
         localDate: row.local_date,
         occurredAt: row.occurred_at,
+        anchorId: row.anchor_id,
+        anchorText: (row.anchors as { text: string; position: number }).text,
+        anchorPosition: (row.anchors as { text: string; position: number }).position,
       })),
     frictionEvents: (frictionRows ?? []).map((row) => ({
       reason: row.reason,
