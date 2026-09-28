@@ -11,8 +11,18 @@ import { performAccountDeletion } from "./deleteAccountOrchestration";
 // names client-side. The redirect this route responds with is irrelevant
 // here (this component owns its own navigation via leaveToAuth) and is
 // simply followed and discarded.
+//
+// Explicitly requests "global" scope — unlike ordinary sign-out (which must
+// only end the current device's session, see the route's own header), a
+// deleted account has no legitimate remaining session anywhere, on any
+// device. This must never be weakened to ordinary sign-out's "local"
+// default just because the two flows share the same route.
 async function clearSupabaseSession() {
-  await fetch("/auth/signout", { method: "POST" });
+  await fetch("/auth/signout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope: "global" }),
+  });
 }
 
 async function unsubscribeBrowserPush() {

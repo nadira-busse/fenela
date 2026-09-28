@@ -33,6 +33,8 @@ import { createGoalWithAnchorsAction } from "@/server/goals/createGoalWithAnchor
 import { archiveActiveGoalAction } from "@/server/goals/archiveActiveGoalAction";
 import { performNewGoalReset } from "./newGoalReset";
 import { performIntakeCompletion, type Intake } from "./intakeCompletion";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSessionExpiredEvent } from "./sessionExpiry";
 
 type Props = {
   userId: string | null;
@@ -159,6 +161,26 @@ export default function HomeClient({
   useEffect(() => {
     ownershipStore?.sync();
   }, [ownershipStore]);
+
+  // Only an authenticated render has a session to lose. Detects a session
+  // that goes bad after this page loaded (another device's sign-out, a
+  // revoked refresh token, natural expiry) and leaves for /auth instead of
+  // leaving the already-rendered authenticated Goal/Anchor UI on screen
+  // while every action against it fails server-side. See sessionExpiry.ts.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (isSessionExpiredEvent(event)) {
+        window.location.href = "/auth";
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [isAuthenticated]);
 
   const canReadOwnedLocalState = hydrated && (!isAuthenticated || ownershipReady);
 
