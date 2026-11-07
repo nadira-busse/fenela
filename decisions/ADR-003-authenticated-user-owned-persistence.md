@@ -61,7 +61,7 @@ Supabase Auth establishes the user's identity.
 
 Persistent application data is associated with that authenticated identity rather than with a client-provided user or device identifier.
 
-The implemented authentication experience uses passwordless email Magic Link.
+The implemented authentication experience uses passwordless email sign-in with a 6-digit code (Supabase Auth's email OTP), originally shipped as a clickable Magic Link and replaced by the equivalent code-entry UX for reliability on reinstalled iOS PWAs.
 
 Fenéla does not implement its own password-management system.
 
@@ -158,7 +158,7 @@ Fenéla now has a server-derived authenticated identity for persistent user-owne
 The implementation:
 
 - establishes identity through Supabase Auth;
-- uses passwordless email Magic Link for sign-in;
+- uses passwordless email sign-in with a 6-digit code for sign-in;
 - scopes account-owned records to the authenticated user;
 - protects account-owned tables with Row Level Security;
 - keeps service credentials out of client code;

@@ -42,7 +42,7 @@ The product reduces that decision to one small action and keeps the surrounding 
 
 A user can:
 
-- sign in with a passwordless Magic Link;
+- sign in with a passwordless email code;
 - choose a small set of preferences;
 - define one goal and describe what makes it difficult;
 - create anchors manually or ask Fenéla for AI-assisted suggestions;

@@ -115,17 +115,17 @@ If Fenéla shows **Not supported**, the current browser/device context does not 
 
 Exact installation and notification-setting menus differ between Android browsers and devices.
 
-## Magic Link sign-in
+## Email code sign-in
 
-Fenéla uses passwordless Magic Link authentication.
+Fenéla uses passwordless email sign-in with a 6-digit code.
 
-Enter your email address on the sign-in screen and use the link sent to that address to complete authentication.
+Enter your email address on the sign-in screen, then enter the 6-digit code sent to that address to complete authentication. After a code is sent, requesting another one is disabled for a short period, to avoid sending repeated codes to the same address.
 
 The hosted deployment uses Supabase's built-in authentication email delivery. That service is rate-limited.
 
-During repeated testing, requesting several Magic Links within a short period can therefore produce a temporary `429 Too Many Requests` response.
+During repeated testing, requesting several codes within a short period can therefore produce a temporary `429 Too Many Requests` response, or a "Too many codes requested" message in the app.
 
-This does not necessarily indicate that the account or application is broken. Wait before requesting another link.
+This does not necessarily indicate that the account or application is broken. Wait before requesting another code.
 
 The hosted deployment accepts this limitation rather than adding a dedicated SMTP service because Fenéla is not operated as a high-volume public SaaS service.
 

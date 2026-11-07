@@ -137,9 +137,9 @@ http://localhost:3000
 
 The application can now connect to the local Supabase stack.
 
-## 7. Test Magic Link sign-in
+## 7. Test email code sign-in
 
-Fenéla uses passwordless email Magic Link authentication.
+Fenéla uses passwordless email sign-in with a 6-digit code.
 
 Open:
 
@@ -147,7 +147,7 @@ Open:
 http://localhost:3000/auth
 ```
 
-Enter an email address and request a Magic Link.
+Enter an email address and request a sign-in code.
 
 The local Supabase stack captures outgoing authentication email in Mailpit. Find the Mailpit URL in the Development Tools section of:
 
@@ -157,17 +157,31 @@ npx supabase@2.113.0 status
 
 If that URL is not reachable and the local Supabase ports were adjusted, use the Mailpit host port published by Docker as described in the Supabase configuration section above.
 
-Open the working Mailpit URL, find the email, and follow the Magic Link.
+Open the working Mailpit URL and find the email. The local Supabase stack's default email template does not render the code as visible text — copy the `token` query parameter value out of the emailed link's URL instead (for example `http://127.0.0.1:54321/auth/v1/verify?token=123456&type=...`) and type it into Fenéla's 6-digit code field. It is the same value a hosted project's email template would show as `{{ .Token }}` once that template is updated (see "Required Supabase dashboard change for email code sign-in" below).
 
-The link returns through:
+Alternatively, the emailed link itself still works and returns through:
 
 ```text
 /auth/callback
 ```
 
-The callback exchanges the authentication code for a Supabase session and returns the user to Fenéla.
+The callback exchanges the authentication code for a Supabase session and returns the user to Fenéla. This is unchanged and is kept as a fallback during rollout; it is not the primary local test path above.
 
 After this step, the normal authenticated product flow can be used locally.
+
+### Required Supabase dashboard change for email code sign-in
+
+This repository change only replaces the client-side UI and verification call (`signInWithOtp` followed by `verifyOtp`, instead of following a clicked link). It does not and cannot change the hosted Supabase project's email template — that is configured in the hosted Supabase dashboard, not in this repository, and is explicitly out of scope for this change.
+
+The hosted project's **Authentication → Email Templates → Magic Link** template must render `{{ .Token }}` (the 6-digit code) somewhere in its body for users to see a code to type. The default Supabase template only renders `{{ .ConfirmationURL }}` (a clickable link) and does not show the code.
+
+Recommended rollout sequence, so neither a stale deployed client nor a template still mid-edit breaks sign-in:
+
+1. In the hosted dashboard, add `{{ .Token }}` to the Magic Link template body **alongside** the existing `{{ .ConfirmationURL }}` link (do not remove the link yet). This is additive: existing emails keep working as links for anyone still on old email or a cached old client, and newly sent emails now also show the code.
+2. Deploy this frontend change. New sign-ins show the 6-digit code UI; the email now contains both the code and a working fallback link (`AuthPanel.tsx` keeps `emailRedirectTo` wired to `/auth/callback` for exactly this reason).
+3. Only once satisfied that users are no longer relying on the link (for example, after a deploy cycle with no `/auth/callback` traffic), optionally remove `{{ .ConfirmationURL }}` from the template. This step is optional — leaving both in the template indefinitely is also safe.
+
+Until step 1 is done on the hosted project, hosted sign-in emails will still only show a link with no visible code, even though the deployed app already asks for one.
 
 ## Optional features
 
@@ -411,7 +425,7 @@ npx supabase@2.113.0 status
 
 Restart `npm run dev` after changing `.env.local`.
 
-### Magic Link email does not appear
+### Sign-in email does not appear
 
 Confirm that the local Supabase stack is running.
 
@@ -419,7 +433,7 @@ Find the Mailpit URL in the Development Tools section of `npx supabase@2.113.0 s
 
 If that URL is not reachable and the local Supabase ports were adjusted, use the Mailpit host port published by Docker as described in the Supabase configuration section above.
 
-Request a new Magic Link from:
+Request a new sign-in code from:
 
 ```text
 http://localhost:3000/auth
@@ -482,7 +496,7 @@ The core local setup is complete when:
 - all version-controlled migrations have been applied;
 - the required Supabase environment values are configured;
 - Fenéla opens locally;
-- Magic Link authentication completes successfully.
+- email code sign-in completes successfully.
 
 The repository validation is complete when:
 

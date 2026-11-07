@@ -8,7 +8,7 @@ The architecture separates canonical account state from optional AI assistance a
 
 ```mermaid
 flowchart LR
-    Auth["Magic Link sign-in"]
+    Auth["Email code sign-in"]
     Screening["Preferences"]
     Goal["Goal and context"]
     Choice{"Anchor preference"}
