@@ -92,6 +92,7 @@ type AnchorGenerationResult = {
   anchors: GeneratedAnchor[];
   personalAnchorInterpretation: PersonalAnchorInterpretation;
   interpretationSource: InterpretationSource;
+  repeatsPrevious: boolean;
 };
 
 type AnchorsApiResponse = {
@@ -101,7 +102,13 @@ type AnchorsApiResponse = {
   personalAnchorInterpretation?: PersonalAnchorInterpretation;
   // "ai" | "fallback" | "deterministic" — see src/app/api/ai/anchors/route.ts.
   source?: string;
+  // True when the server could not produce a set clearly different from
+  // the suggestions already shown this session.
+  repeatsPrevious?: boolean;
 };
+
+// Matches the server's own cap (MAX_PREVIOUS_ANCHORS in src/lib/aiAnchors.ts).
+const MAX_SHOWN_SUGGESTIONS = 15;
 
 function isPersonalAnchorInterpretation(value: unknown): value is PersonalAnchorInterpretation {
   const data = value as Partial<PersonalAnchorInterpretation>;
@@ -137,6 +144,7 @@ function buildLocalFallbackInterpretation(input: {
 async function generateAnchorsClient(payload: {
   mode: AnchorChoiceHelp;
   deviceId?: string;
+  previousAnchors?: string[];
   intake: { name: string; goal: string; struggle: string; goalWhy: string };
   screening?: ScreeningV1 | null;
 }): Promise<AnchorGenerationResult> {
@@ -182,6 +190,7 @@ async function generateAnchorsClient(payload: {
     anchors,
     personalAnchorInterpretation,
     interpretationSource: mapApiSourceToInterpretationSource(data?.source ?? "fallback"),
+    repeatsPrevious: data?.repeatsPrevious === true,
   };
 }
 
@@ -228,7 +237,15 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
 
+  const [repeatsPrevious, setRepeatsPrevious] = useState(false);
+
   const didGenerateRef = useRef(false);
+  // Every suggestion the app has shown during this intake session, oldest
+  // first, so Regenerate can ask the server to avoid all of them rather
+  // than only the latest set. Holds only texts the server produced, never
+  // the user's own edits. Temporary presentation state: it ends with the
+  // session and is never persisted.
+  const shownSuggestionsRef = useRef<string[]>([]);
 
   useEffect(() => {
     const storedScreening = loadScreening();
@@ -347,12 +364,13 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
     );
   };
 
-  const runAIGeneration = async () => {
+  const runAIGeneration = async (previousAnchors?: string[]) => {
     const hasManual = anchors.some((anchor) => anchor.text.trim().length > 0);
     if (hasManual && didGenerateRef.current) return;
 
     setAiLoading(true);
     setAiError(null);
+    setRepeatsPrevious(false);
 
     try {
       const storedScreening = screening ?? loadScreening();
@@ -381,6 +399,7 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
       const generated = await generateAnchorsClient({
         mode,
         deviceId: typeof window !== "undefined" ? getOrCreateDeviceId() : undefined,
+        previousAnchors,
         intake: {
           name: userName,
           goal: goal.trim(),
@@ -398,9 +417,18 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
         source: anchor.source,
       }));
 
+      const shown = [...shownSuggestionsRef.current];
+      for (const anchor of nextAnchors) {
+        if (!shown.some((text) => text.toLowerCase() === anchor.text.toLowerCase())) {
+          shown.push(anchor.text);
+        }
+      }
+      shownSuggestionsRef.current = shown.slice(-MAX_SHOWN_SUGGESTIONS);
+
       setAnchors(nextAnchors);
       setPersonalAnchorInterpretation(generated.personalAnchorInterpretation);
       setInterpretationSource(generated.interpretationSource);
+      setRepeatsPrevious(generated.repeatsPrevious);
       didGenerateRef.current = true;
     } catch (error: unknown) {
       const message =
@@ -647,7 +675,7 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                         setPersonalAnchorInterpretation(null);
                         setInterpretationSource(null);
                         setAnchors([{ id: makeId("anchor"), text: "", source: "USER" }]);
-                        runAIGeneration();
+                        runAIGeneration(shownSuggestionsRef.current);
                       }}
                       disabled={aiLoading}
                       className="text-xs font-semibold text-black/60 underline disabled:opacity-40"
@@ -656,6 +684,24 @@ const IntakeScreen = ({ onComplete, initialName = "" }: IntakeScreenProps) => {
                     </button>
                   )}
                 </div>
+
+                {!userDecidesAnchors &&
+                  !aiLoading &&
+                  anchors.some((anchor) => anchor.source === "FALLBACK") && (
+                    <p className="text-xs text-black/50 leading-snug">
+                      Personal suggestions aren&apos;t available right now, so these are general
+                      starting points, not tailored to your answers. Edit them freely or write your
+                      own.
+                    </p>
+                  )}
+
+                {!userDecidesAnchors && !aiLoading && repeatsPrevious && (
+                  <p className="text-xs text-black/50 leading-snug">
+                    Fenéla couldn&apos;t find clearly different suggestions this time, so some of
+                    these are similar to ones you&apos;ve already seen. You can edit them or write
+                    your own.
+                  </p>
+                )}
 
                 <div className="space-y-3">
                   {anchors.map((anchor, index) => {

@@ -30,6 +30,8 @@ If the first response fails parsing, anchor or safety validation, Fenéla makes 
 
 If the repaired output is still invalid, the route returns local deterministic suggestions.
 
+On Regenerate, the request carries the suggestions already shown in the current intake session. Repeating or only rewording one of them also triggers the single repair attempt. Unlike parsing, structure and safety, novelty is a soft requirement: if the repair cannot produce a fully new set, a valid and safe set is still returned, marked as repeating earlier suggestions, so the user is told instead of receiving generic fallback output.
+
 ## Reason
 
 The AI feature addresses one specific point of friction: turning a stated goal into a practical place to begin.

@@ -145,7 +145,9 @@ When enabled, Fenéla may send the following information to OpenAI:
 - your goal;
 - why that goal matters to you;
 - the current struggle you entered during intake;
-- selected guidance-preference categories.
+- selected guidance-preference categories;
+- when you choose Regenerate, the suggestions already shown to you during
+  the same intake, so the new suggestions can differ from them.
 
 Fenéla does not send OpenAI:
 

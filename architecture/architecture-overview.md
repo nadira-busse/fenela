@@ -71,9 +71,9 @@ authenticated user input
 → canonical AI-assistance preference check
 → OpenAI (optional)
 → untrusted structured output
-→ parse + sanitize + validate + safety check
+→ parse + sanitize + validate + safety check + repeat check against this session's earlier suggestions
 → one bounded repair attempt if needed
-→ deterministic fallback if AI still fails
+→ deterministic fallback if AI still fails (each otherwise-silent fallback logs a fixed reason code)
 → user review
 → independent persistence validation
 → canonical Goal/Anchor rows
@@ -81,7 +81,7 @@ authenticated user input
 
 The client cannot enable provider processing when the canonical preference says AI assistance is off. A preference lookup failure also fails closed to the deterministic path.
 
-The model receives only the bounded goal/context fields and guidance categories needed for anchor suggestions. It does not receive account identity, event history or reflection history.
+The model receives only the bounded goal/context fields and guidance categories needed for anchor suggestions, plus, on Regenerate, up to 15 suggestions already shown in the same intake session. It does not receive account identity, event history or reflection history.
 
 AI output has no direct persistence authority. The user must confirm the anchor set, and the server validates it again before writing canonical state.
 

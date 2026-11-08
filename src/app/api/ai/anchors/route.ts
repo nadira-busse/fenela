@@ -3,16 +3,19 @@ import OpenAI, { APIError } from "openai";
 
 import {
   anchorCount,
-  buildErrorAnchors,
+  buildFallbackAnchors,
   buildFallbackInterpretation,
   buildPrompt,
   buildRepairPrompt,
+  findRepeatedAnchorIndexes,
   isValidMode,
   safeParseAIResponse,
   sanitizeAndDedupeAnchors,
   sanitizeInterpretation,
+  sanitizePreviousAnchors,
   validateAnchors,
   type AIResponse,
+  type AnchorItem,
   type AnchorsRequest,
 } from "@/lib/aiAnchors";
 import { validateSafeAnchorList, validateSafeUserText } from "@/lib/safety";
@@ -142,6 +145,7 @@ function validateRequestBody(body: unknown): AnchorsRequest | null {
   return {
     mode: candidate.mode,
     deviceId: hasText(candidate.deviceId) ? candidate.deviceId : undefined,
+    previousAnchors: sanitizePreviousAnchors(candidate.previousAnchors),
     intake: {
       name: hasBoundedText(candidate.intake.name, MAX_NAME_LENGTH)
         ? candidate.intake.name.trim()
@@ -199,69 +203,136 @@ async function generateOpenAIResponse(input: {
   return completion.choices[0]?.message?.content ?? "";
 }
 
-async function generateAndValidate(input: { client: OpenAI; body: AnchorsRequest; count: number }) {
-  const raw = await generateOpenAIResponse({
-    client: input.client,
-    prompt: buildPrompt(input.body, input.count),
-  });
+type EvaluatedAttempt = {
+  raw: string;
+  parsed: AIResponse | null;
+  anchors: AnchorItem[];
+  // Parsed, structurally valid and safe: usable as AI output.
+  usable: boolean;
+  // Indexes of anchors that repeat or only reword a suggestion already
+  // shown this session.
+  repeated: number[];
+  errors: string[];
+};
 
+function evaluateAttempt(raw: string, body: AnchorsRequest, count: number): EvaluatedAttempt {
   const parsed = safeParseAIResponse(raw);
   const anchors = sanitizeAndDedupeAnchors(parsed?.anchors);
-  const validation = validateAnchors(anchors, input.count);
+  const validation = validateAnchors(anchors, count);
   const safetyValidation = validateSafeAnchorList(anchors.map((anchor) => anchor.text));
+  const repeated = findRepeatedAnchorIndexes(anchors, body.previousAnchors);
 
-  if (parsed && validation.ok && safetyValidation.ok) {
-    return {
-      parsed,
-      anchors,
-    };
+  return {
+    raw,
+    parsed,
+    anchors,
+    usable: Boolean(parsed) && validation.ok && safetyValidation.ok,
+    repeated,
+    errors: [
+      ...(parsed ? validation.errors : ["Response was not valid JSON."]),
+      ...(!safetyValidation.ok ? [safetyValidation.message] : []),
+      ...repeated.map(
+        (index) =>
+          `Anchor ${index + 1} repeats or only rewords an anchor already shown: "${anchors[index].text}".`
+      ),
+    ],
+  };
+}
+
+function toGenerated(attempt: EvaluatedAttempt) {
+  return {
+    parsed: attempt.parsed as AIResponse,
+    anchors: attempt.anchors,
+    repeatsPrevious: attempt.repeated.length > 0,
+  };
+}
+
+// One generation plus at most one repair call. Safety and structure are
+// hard requirements: output failing either is never shown. Novelty against
+// earlier suggestions is a soft requirement: it triggers the repair call,
+// but if the model still cannot produce a fully new set, a usable set is
+// returned with `repeatsPrevious: true` so the UI can say so honestly,
+// rather than discarding relevant personalized output for generic
+// fallback templates.
+async function generateAndValidate(input: { client: OpenAI; body: AnchorsRequest; count: number }) {
+  const first = evaluateAttempt(
+    await generateOpenAIResponse({
+      client: input.client,
+      prompt: buildPrompt(input.body, input.count),
+    }),
+    input.body,
+    input.count
+  );
+
+  if (first.usable && first.repeated.length === 0) {
+    return toGenerated(first);
   }
 
-  const repairRaw = await generateOpenAIResponse({
-    client: input.client,
-    prompt: buildRepairPrompt({
-      body: input.body,
-      count: input.count,
-      previousRaw: raw,
-      validationErrors: [
-        ...(parsed ? validation.errors : ["Response was not valid JSON."]),
-        ...(!safetyValidation.ok ? [safetyValidation.message] : []),
-      ],
+  const repair = evaluateAttempt(
+    await generateOpenAIResponse({
+      client: input.client,
+      prompt: buildRepairPrompt({
+        body: input.body,
+        count: input.count,
+        previousRaw: first.raw,
+        validationErrors: first.errors,
+      }),
+      temperature: 0.2,
     }),
-    temperature: 0.2,
-  });
+    input.body,
+    input.count
+  );
 
-  const repairParsed = safeParseAIResponse(repairRaw);
-  const repairAnchors = sanitizeAndDedupeAnchors(repairParsed?.anchors);
-  const repairValidation = validateAnchors(repairAnchors, input.count);
-  const repairSafetyValidation = validateSafeAnchorList(repairAnchors.map((anchor) => anchor.text));
+  if (repair.usable && (!first.usable || repair.repeated.length <= first.repeated.length)) {
+    return toGenerated(repair);
+  }
 
-  if (repairParsed && repairValidation.ok && repairSafetyValidation.ok) {
-    return {
-      parsed: repairParsed,
-      anchors: repairAnchors,
-    };
+  if (first.usable) {
+    return toGenerated(first);
   }
 
   return null;
 }
 
+// Fallback paths that are otherwise silent. Invalid generations and
+// provider errors keep their own warning logs below.
+type FallbackReason = "ai_assistance_not_enabled" | "provider_not_configured" | "rate_limited";
+
 function buildFallbackResponse(body: AnchorsRequest, count: number) {
+  const fallback = buildFallbackAnchors(body, count, body.previousAnchors);
+
   return {
     personalAnchorInterpretation: buildFallbackInterpretation(body),
-    anchors: buildErrorAnchors(body, count),
+    anchors: fallback.anchors,
+    repeatsPrevious: fallback.repeatsPrevious,
     source: "fallback" as const,
   };
 }
 
+// Paths that return the fallback without a provider error log of their own.
+// Logging a fixed reason code (never user text) makes it visible to
+// operators why users see generic fallback anchors instead of AI ones.
+function fallbackWithReason(
+  body: AnchorsRequest,
+  count: number,
+  userId: string,
+  reason: FallbackReason
+) {
+  console.info("aiAnchors.fallback", { userId, mode: body.mode, reason });
+  return NextResponse.json(buildFallbackResponse(body, count));
+}
+
 function buildSuccessResponse(
   body: AnchorsRequest,
-  parsed: AIResponse,
-  anchors: { text: string }[]
+  generated: { parsed: AIResponse; anchors: AnchorItem[]; repeatsPrevious: boolean }
 ) {
   return {
-    personalAnchorInterpretation: sanitizeInterpretation(parsed.personalAnchorInterpretation, body),
-    anchors,
+    personalAnchorInterpretation: sanitizeInterpretation(
+      generated.parsed.personalAnchorInterpretation,
+      body
+    ),
+    anchors: generated.anchors,
+    repeatsPrevious: generated.repeatsPrevious,
     source: "ai" as const,
   };
 }
@@ -325,11 +396,11 @@ export async function POST(req: NextRequest) {
   const canonicalAiAllowed = await isCanonicalAiAssistanceAllowed();
 
   if (!canonicalAiAllowed) {
-    return NextResponse.json(buildFallbackResponse(body, count));
+    return fallbackWithReason(body, count, user.id, "ai_assistance_not_enabled");
   }
 
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json(buildFallbackResponse(body, count));
+    return fallbackWithReason(body, count, user.id, "provider_not_configured");
   }
 
   // Only the OpenAI-cost path is rate-limited; the deterministic path above
@@ -343,7 +414,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (!allowed) {
-    return NextResponse.json(buildFallbackResponse(body, count));
+    return fallbackWithReason(body, count, user.id, "rate_limited");
   }
 
   const client = new OpenAI({
@@ -371,7 +442,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(buildFallbackResponse(body, count));
     }
 
-    return NextResponse.json(buildSuccessResponse(body, generated.parsed, generated.anchors));
+    return NextResponse.json(buildSuccessResponse(body, generated));
   } catch (error) {
     // Provider/network failure (timeout, rate limit, outage, ...) — logged
     // through summarizeProviderError's own bounded fields only (see its

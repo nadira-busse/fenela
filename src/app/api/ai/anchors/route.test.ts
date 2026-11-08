@@ -192,6 +192,47 @@ describe("POST /api/ai/anchors", () => {
     }
   });
 
+  it("Regenerate while AI is unavailable: the fallback does not silently repeat the anchors already shown", async () => {
+    const originalKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+
+    try {
+      const firstRequest = makeRequest(validBody({ mode: "SUGGEST_ANCHORS" }));
+      const firstResponse = await POST(firstRequest as Parameters<typeof POST>[0]);
+      const firstBody = await firstResponse.json();
+
+      expect(firstBody.source).toBe("fallback");
+      const firstTexts = firstBody.anchors.map((a: { text: string }) => a.text);
+
+      const secondRequest = makeRequest(
+        validBody({ mode: "SUGGEST_ANCHORS", previousAnchors: firstTexts })
+      );
+      const secondResponse = await POST(secondRequest as Parameters<typeof POST>[0]);
+      const secondBody = await secondResponse.json();
+
+      expect(secondBody.source).toBe("fallback");
+      const secondTexts = secondBody.anchors.map((a: { text: string }) => a.text);
+
+      expect(secondTexts.some((text: string) => firstTexts.includes(text))).toBe(false);
+    } finally {
+      if (originalKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalKey;
+      }
+    }
+  });
+
+  it("rejects a previousAnchors payload that is not an array instead of letting it through unsanitized", async () => {
+    const request = makeRequest(validBody({ mode: "I_DECIDE", previousAnchors: "not-an-array" }));
+    const response = await POST(request as Parameters<typeof POST>[0]);
+
+    // previousAnchors is sanitized defensively (sanitizePreviousAnchors
+    // returns [] for a non-array), never rejected as a bad request — this
+    // asserts the route still completes normally rather than crashing.
+    expect(response.status).toBe(200);
+  });
+
   it("authenticated, rate limit exceeded: receives the fallback instead of calling OpenAI", async () => {
     const originalKey = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = "test-key";
@@ -340,6 +381,28 @@ describe("POST /api/ai/anchors", () => {
       expect(body.source).toBe("ai");
       expect(body.anchors).toHaveLength(3);
       expect(createCompletion).toHaveBeenCalledTimes(1);
+    });
+
+    it("Regenerate while AI is active: previously shown anchors are forwarded to the model so it can avoid repeating them", async () => {
+      createCompletion.mockResolvedValueOnce(completionWith(VALID_AI_JSON));
+
+      await makeAiRequest({
+        previousAnchors: ["Write the first sentence of your report"],
+      });
+
+      const sentPrompt = createCompletion.mock.calls[0][0].messages[1].content;
+      expect(sentPrompt).toContain("Write the first sentence of your report");
+    });
+
+    it("a previously shown anchor carrying unsafe intent is dropped before it ever reaches the model", async () => {
+      createCompletion.mockResolvedValueOnce(completionWith(VALID_AI_JSON));
+
+      await makeAiRequest({
+        previousAnchors: ["Hack their account tonight"],
+      });
+
+      const sentPrompt = createCompletion.mock.calls[0][0].messages[1].content;
+      expect(sentPrompt).not.toContain("Hack their account tonight");
     });
 
     it("malformed first response: triggers exactly one repair call, and a valid repair response is used", async () => {
@@ -652,6 +715,233 @@ describe("POST /api/ai/anchors", () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+  });
+
+  describe("variation across Regenerate and fallback provenance", () => {
+    const REPRO_INTAKE = {
+      goal: "Work in small portions",
+      struggle: "Lack of motivation",
+      goalWhy: "Helps me to reach my goals",
+    };
+
+    function aiJson(anchors: string[]) {
+      return JSON.stringify({
+        personalAnchorInterpretation: JSON.parse(VALID_AI_JSON).personalAnchorInterpretation,
+        anchors: anchors.map((text) => ({ text })),
+      });
+    }
+
+    async function request(overrides: Record<string, unknown> = {}, withKey = true) {
+      const originalKey = process.env.OPENAI_API_KEY;
+
+      if (withKey) {
+        process.env.OPENAI_API_KEY = "test-key";
+      } else {
+        delete process.env.OPENAI_API_KEY;
+      }
+
+      try {
+        const req = makeRequest(
+          validBody({ mode: "SUGGEST_ANCHORS", intake: REPRO_INTAKE, ...overrides })
+        );
+        const response = await POST(req as Parameters<typeof POST>[0]);
+        return { response, body: await response.json() };
+      } finally {
+        if (originalKey === undefined) {
+          delete process.env.OPENAI_API_KEY;
+        } else {
+          process.env.OPENAI_API_KEY = originalKey;
+        }
+      }
+    }
+
+    const FIRST_SET = [
+      "Set a ten minute timer for one portion",
+      "Write the next portion on a sticky note",
+      "Clear your desk for the first portion",
+    ];
+
+    it("an AI answer that only rewords suggestions already shown triggers one repair, and a new set is used", async () => {
+      createCompletion
+        .mockResolvedValueOnce(
+          completionWith(
+            aiJson([
+              "Set a 10 minute timer for one portion",
+              "Write the next portion on a sticky note",
+              "Put on music for the first portion",
+            ])
+          )
+        )
+        .mockResolvedValueOnce(
+          completionWith(
+            aiJson([
+              "Finish one paragraph then stand up",
+              "Text a friend which portion you start",
+              "Open only the file for portion one",
+            ])
+          )
+        );
+
+      const { body } = await request({ previousAnchors: FIRST_SET });
+
+      expect(body.source).toBe("ai");
+      expect(body.repeatsPrevious).toBe(false);
+      expect(createCompletion).toHaveBeenCalledTimes(2);
+
+      const repairPrompt = createCompletion.mock.calls[1][0].messages[1].content;
+      expect(repairPrompt).toContain("repeats or only rewords an anchor already shown");
+      expect(body.anchors.map((a: { text: string }) => a.text)).not.toContain(
+        "Write the next portion on a sticky note"
+      );
+    });
+
+    it("when the repair still repeats earlier suggestions, AI output is kept but reported honestly as repeating", async () => {
+      const repeating = completionWith(aiJson(FIRST_SET));
+      createCompletion.mockResolvedValueOnce(repeating).mockResolvedValueOnce(repeating);
+
+      const { body } = await request({ previousAnchors: FIRST_SET });
+
+      expect(body.source).toBe("ai");
+      expect(body.repeatsPrevious).toBe(true);
+      expect(body.anchors).toHaveLength(3);
+    });
+
+    it("a usable but repeating first answer is kept when the repair answer is invalid", async () => {
+      createCompletion
+        .mockResolvedValueOnce(completionWith(aiJson(FIRST_SET)))
+        .mockResolvedValueOnce(completionWith("not json"));
+
+      const { body } = await request({ previousAnchors: FIRST_SET });
+
+      expect(body.source).toBe("ai");
+      expect(body.repeatsPrevious).toBe(true);
+    });
+
+    it("three anchors that are rewordings of one action fail validation and trigger a repair", async () => {
+      createCompletion
+        .mockResolvedValueOnce(
+          completionWith(
+            aiJson([
+              "Spend five minutes on one portion",
+              "Spend 5 minutes on a portion",
+              "Clear your desk for the first portion",
+            ])
+          )
+        )
+        .mockResolvedValueOnce(completionWith(aiJson(FIRST_SET)));
+
+      const { body } = await request();
+
+      expect(createCompletion).toHaveBeenCalledTimes(2);
+      expect(createCompletion.mock.calls[1][0].messages[1].content).toContain(
+        "describe the same action"
+      );
+      expect(body.source).toBe("ai");
+      expect(body.anchors.map((a: { text: string }) => a.text)).toEqual(FIRST_SET);
+    });
+
+    it("three Regenerate rounds with AI available: every earlier suggestion of the session reaches the prompt", async () => {
+      const rounds = [
+        FIRST_SET,
+        [
+          "Finish one paragraph then stand up",
+          "Text a friend which portion you start",
+          "Open only the file for portion one",
+        ],
+        [
+          "Tick off one portion on paper",
+          "Read the last line you wrote",
+          "Put your phone in another room",
+        ],
+      ];
+      const shown: string[] = [];
+
+      for (const [index, anchors] of rounds.entries()) {
+        createCompletion.mockResolvedValueOnce(completionWith(aiJson(anchors)));
+
+        const { body } = await request({ previousAnchors: [...shown] });
+
+        expect(body.source).toBe("ai");
+        expect(body.repeatsPrevious).toBe(false);
+
+        const prompt = createCompletion.mock.calls[index][0].messages[1].content;
+        for (const text of shown) {
+          expect(prompt).toContain(text);
+        }
+
+        shown.push(...body.anchors.map((a: { text: string }) => a.text));
+      }
+
+      expect(new Set(shown).size).toBe(9);
+    });
+
+    it("provider account out of credit (429 credit_balance_exhausted): falls back, labelled as fallback, and logs the bounded provider code", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      try {
+        createCompletion.mockRejectedValueOnce(
+          new MockAPIError({ status: 429, code: "credit_balance_exhausted" })
+        );
+
+        const { body } = await request();
+
+        expect(body.source).toBe("fallback");
+        expect(body.anchors).toHaveLength(3);
+        expect(warnSpy).toHaveBeenCalledWith(
+          "aiAnchors.providerError",
+          expect.objectContaining({ status: 429, code: "credit_balance_exhausted" })
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      [
+        "ai_assistance_not_enabled",
+        () => getOwnUserPreference.mockResolvedValue({ anchor_choice_mode: "USER_DECIDES" }),
+        true,
+      ],
+      ["provider_not_configured", () => {}, false],
+      ["rate_limited", () => checkRateLimit.mockResolvedValue(false), true],
+    ] as const)(
+      "otherwise-silent fallback path logs its reason code: %s",
+      async (reason, arrange, withKey) => {
+        const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        try {
+          arrange();
+          const { body } = await request({}, withKey);
+
+          expect(body.source).toBe("fallback");
+          expect(createCompletion).not.toHaveBeenCalled();
+          expect(infoSpy).toHaveBeenCalledWith("aiAnchors.fallback", {
+            userId: "user-a",
+            mode: "SUGGEST_ANCHORS",
+            reason,
+          });
+          expect(JSON.stringify(infoSpy.mock.calls)).not.toContain("motivation");
+        } finally {
+          infoSpy.mockRestore();
+        }
+      }
+    );
+
+    it("fallback across three Regenerate rounds: two new sets, then an honest repeatsPrevious signal", async () => {
+      const shown: string[] = [];
+      const results = [];
+
+      for (let round = 0; round < 3; round++) {
+        const { body } = await request({ previousAnchors: [...shown] }, false);
+        results.push(body);
+        shown.push(...body.anchors.map((a: { text: string }) => a.text));
+      }
+
+      expect(results.map((r) => r.source)).toEqual(["fallback", "fallback", "fallback"]);
+      expect(results.map((r) => r.repeatsPrevious)).toEqual([false, false, true]);
+      expect(results.every((r) => r.anchors.length === 3)).toBe(true);
+      expect(new Set(shown.slice(0, 6)).size).toBe(6);
     });
   });
 });

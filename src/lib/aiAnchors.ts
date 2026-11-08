@@ -37,6 +37,11 @@ export type PersonalAnchorInterpretation = {
 export type AnchorsRequest = {
   mode: AnchorChoiceHelp;
   deviceId?: string;
+  // Suggestions already shown during the current intake session (the first
+  // generation and every Regenerate since), supplied by the client so both
+  // the AI prompt and the deterministic fallback can avoid repeating them.
+  // Untrusted input: see sanitizePreviousAnchors.
+  previousAnchors?: string[];
   intake: {
     name?: string;
     goal: string;
@@ -112,12 +117,87 @@ function stripTrailingPunctuation(value: string) {
   return value.replace(/[.,;:!?\u2026]+$/g, "").trim();
 }
 
+// The UI already supplies timing context, so a trailing time word is
+// removed. A preposition directly before it goes too ("goal for today"
+// becomes "goal", not "goal for"), so the anchor does not end mid-phrase.
 function stripTrailingTimeWords(value: string) {
-  return value.replace(/\s+(right now|right away|now|today)\s*$/i, "").trim();
+  return value
+    .replace(/\s+(?:(?:for|by|until|before|from)\s+)?(right now|right away|now|today)\s*$/i, "")
+    .trim();
 }
 
 function wordCount(value: string) {
   return normalizeWhitespace(value).split(" ").filter(Boolean).length;
+}
+
+// Words that leave a phrase visibly unfinished when they end it ("It rains
+// a lot and", "I wake up tired every", "finish the report before").
+const DANGLING_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "so",
+  "to",
+  "of",
+  "for",
+  "in",
+  "on",
+  "at",
+  "by",
+  "from",
+  "with",
+  "about",
+  "into",
+  "before",
+  "after",
+  "because",
+  "when",
+  "then",
+  "than",
+  "that",
+  "instead",
+  "every",
+  "my",
+  "your",
+  "his",
+  "her",
+  "their",
+  "our",
+  "i",
+  "is",
+  "am",
+  "are",
+  "get",
+]);
+
+const CLAUSE_BREAK = /[,;:.!?]|\s(?:and|but|because|so|when)\s/i;
+
+// Short, word-bounded fragment of the user's own text for the fallback
+// templates. Never slices characters (which can cut a word in half). Long
+// input is shortened at its first clause break when that keeps at least two
+// words, then capped by word count, then stripped of dangling trailing
+// words, so the fragment does not end mid-phrase. Capping by word count
+// also keeps every fallback anchor within the 3-10 word validation limit.
+function shortFragment(value: string, maxWords: number) {
+  const normalized = normalizeWhitespace(value);
+  const allWords = normalized.split(" ").filter(Boolean);
+
+  if (allWords.length <= maxWords) {
+    return stripTrailingPunctuation(normalized);
+  }
+
+  const firstClause = normalized.split(CLAUSE_BREAK)[0].trim();
+  const clauseWords = firstClause.split(" ").filter(Boolean);
+  const words = (clauseWords.length >= 2 ? clauseWords : allWords).slice(0, maxWords);
+
+  while (words.length > 1 && DANGLING_WORDS.has(words[words.length - 1].toLowerCase())) {
+    words.pop();
+  }
+
+  return stripTrailingPunctuation(words.join(" "));
 }
 
 function sanitizeAnchorText(raw: unknown) {
@@ -131,6 +211,146 @@ function sanitizeLine(raw: unknown, maxWords: number) {
   const words = cleaned.split(" ").filter(Boolean);
 
   return words.slice(0, maxWords).join(" ").slice(0, 180).trim();
+}
+
+// Bounds how many previously-shown anchors a client can echo back, and
+// re-screens each one with the same unsafe-intent check applied to fresh
+// user input. The intake screen only sends texts that an earlier response
+// itself produced, but the route is a plain POST endpoint, so this is
+// still untrusted input, not server-produced data. 15 covers one intake
+// session at the AI route's own rate limit (an initial generation plus
+// four Regenerate clicks, three anchors each) while keeping the prompt
+// small.
+const MAX_PREVIOUS_ANCHORS = 15;
+
+// Deterministic "is this the same action, reworded?" check used both to
+// keep the three anchors in one response distinct and to keep Regenerate
+// from offering a trivial rewording of something already shown. It
+// compares content words (stopwords dropped, number words folded to
+// digits, a trailing plural "s" removed) by Jaccard overlap. It is a
+// bounded heuristic, not semantic understanding: it catches "Spend five
+// minutes on the report" vs "Spend 5 minutes on report", and lets
+// genuinely different actions on the same goal through.
+const SIMILARITY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "to",
+  "of",
+  "for",
+  "on",
+  "in",
+  "at",
+  "and",
+  "or",
+  "with",
+  "your",
+  "my",
+  "you",
+  "it",
+  "this",
+  "that",
+  "about",
+  "from",
+  "into",
+  "by",
+  "just",
+  "only",
+]);
+
+const NUMBER_WORDS: Record<string, string> = {
+  one: "1",
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  ten: "10",
+  fifteen: "15",
+  twenty: "20",
+};
+
+const NEAR_DUPLICATE_THRESHOLD = 0.6;
+
+function anchorContentTokens(text: string) {
+  const tokens = new Set<string>();
+
+  for (const rawWord of text.toLowerCase().split(/[^a-z0-9]+/)) {
+    if (!rawWord || SIMILARITY_STOPWORDS.has(rawWord)) {
+      continue;
+    }
+
+    const word = NUMBER_WORDS[rawWord] ?? rawWord;
+    const stemmed =
+      word.length > 3 && word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word;
+
+    tokens.add(stemmed);
+  }
+
+  return tokens;
+}
+
+export function areNearDuplicateAnchors(a: string, b: string) {
+  const tokensA = anchorContentTokens(a);
+  const tokensB = anchorContentTokens(b);
+
+  if (tokensA.size === 0 || tokensB.size === 0) {
+    return normalizeWhitespace(a).toLowerCase() === normalizeWhitespace(b).toLowerCase();
+  }
+
+  let shared = 0;
+
+  for (const token of tokensA) {
+    if (tokensB.has(token)) {
+      shared++;
+    }
+  }
+
+  const union = tokensA.size + tokensB.size - shared;
+
+  return shared / union >= NEAR_DUPLICATE_THRESHOLD;
+}
+
+// Indexes of anchors that repeat, or only trivially reword, an anchor
+// already shown to the user this session.
+export function findRepeatedAnchorIndexes(anchors: AnchorItem[], previousAnchors: string[] = []) {
+  return anchors
+    .map((anchor, index) =>
+      previousAnchors.some((previous) => areNearDuplicateAnchors(anchor.text, previous))
+        ? index
+        : -1
+    )
+    .filter((index) => index !== -1);
+}
+
+export function sanitizePreviousAnchors(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of raw) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const text = sanitizeAnchorText(item);
+    const key = text.toLowerCase();
+
+    if (!text || hasUnsafeIntent(text) || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(text);
+
+    if (result.length >= MAX_PREVIOUS_ANCHORS) {
+      break;
+    }
+  }
+
+  return result;
 }
 
 export function isValidMode(value: unknown): value is AnchorChoiceHelp {
@@ -306,6 +526,14 @@ export function validateAnchors(anchors: AnchorItem[], count: number): Validatio
     if (hasUnsafeIntent(anchor.text)) {
       errors.push(`Anchor ${index + 1} contains unsafe or unsupported intent.`);
     }
+
+    for (let other = 0; other < index; other++) {
+      if (areNearDuplicateAnchors(anchor.text, anchors[other].text)) {
+        errors.push(
+          `Anchors ${other + 1} and ${index + 1} describe the same action; make each a different action.`
+        );
+      }
+    }
   });
 
   return {
@@ -313,6 +541,32 @@ export function validateAnchors(anchors: AnchorItem[], count: number): Validatio
     errors,
   };
 }
+
+// Shared by buildPrompt and buildRepairPrompt so Regenerate can ask for
+// genuinely different wording instead of relying on temperature alone to
+// avoid repeating what the user has already seen this session.
+function previousAnchorsPromptLines(previousAnchors: string[] | undefined) {
+  if (!previousAnchors || previousAnchors.length === 0) {
+    return [];
+  }
+
+  return [
+    "Anchors already shown to this user this session:",
+    ...previousAnchors.map((text) => `- ${text}`),
+    "Do not repeat or reword these. Each new anchor must be a different action or approach than every anchor listed above, while staying just as relevant to the user's goal.",
+    "",
+  ];
+}
+
+// How goal, struggle and why each shape an anchor. Shared by buildPrompt
+// and buildRepairPrompt so a repair attempt keeps the same personalization
+// contract as the first attempt.
+const PERSONALIZATION_RULES = [
+  "- The goal decides what each anchor moves toward.",
+  "- The struggle decides what is realistic: shape each step so it still works when that struggle is present (smaller, easier to start, less effort to begin).",
+  "- The why decides what kind of step feels meaningful. Use it as context; do not quote or restate it inside an anchor.",
+  "- The anchors must be genuinely different actions or approaches (for example: preparing, doing a first slice, lowering the struggle), not rewordings of one action.",
+];
 
 export function buildPrompt(body: AnchorsRequest, count: number) {
   const screening = body.screening;
@@ -335,7 +589,7 @@ export function buildPrompt(body: AnchorsRequest, count: number) {
     "",
     "Primary task:",
     "- Interpret the user's actual goal, struggle and why.",
-    "- Use the user's why as the main grounding signal for the anchors.",
+    ...PERSONALIZATION_RULES,
     "- Create tiny anchors that are clearly connected to that meaning.",
     "- Do not use category templates or generic defaults.",
     "- Do not simply repeat the user's sentence.",
@@ -419,6 +673,7 @@ export function buildPrompt(body: AnchorsRequest, count: number) {
     "- Give clear suggestions.",
     "- Do not present many options.",
     "",
+    ...previousAnchorsPromptLines(body.previousAnchors),
     "User context:",
     `goal: ${body.intake.goal}`,
     `goalWhy: ${body.intake.goalWhy}`,
@@ -455,7 +710,7 @@ export function buildRepairPrompt(input: {
     "- Each anchor must be 3-10 words.",
     "- Each anchor must be specific to the user's goal, struggle and why.",
     "- Do not end anchors with now, today, right now or right away. The UI already provides timing context.",
-    "- Use the user's why as the main grounding signal.",
+    ...PERSONALIZATION_RULES,
     "- Do not ask the user to prioritize, list, plan or choose between multiple things.",
     "- Do not create anchors that add new decision work.",
     "- Prefer one visible, physical or written next action.",
@@ -467,6 +722,7 @@ export function buildRepairPrompt(input: {
     "- No harmful, illegal, abusive or exploitative suggestions.",
     "- Do not generate anchors for violence, threats, stalking, harassment, theft, fraud, scams, weapons, drug dealing, hacking, malware, evading law enforcement, sexual exploitation, self-harm or harm to others.",
     "",
+    ...previousAnchorsPromptLines(input.body.previousAnchors),
     "User context:",
     `goal: ${input.body.intake.goal}`,
     `goalWhy: ${input.body.intake.goalWhy}`,
@@ -486,20 +742,98 @@ export function buildRepairPrompt(input: {
   ].join("\n");
 }
 
-export function buildErrorAnchors(body: AnchorsRequest, count: number): AnchorItem[] {
-  const goal = normalizeWhitespace(body.intake.goal).slice(0, 60);
-  const struggle = normalizeWhitespace(body.intake.struggle).slice(0, 60);
-  const why = normalizeWhitespace(body.intake.goalWhy).slice(0, 60);
+// Deterministic, no-AI fallback for when AI is unavailable or its output
+// fails validation. It is deliberately not a second pseudo-AI system: a
+// small fixed set of concrete, generally useful micro-actions, labelled as
+// general starting points in the UI (source "fallback"), never presented
+// as personalized suggestions.
+//
+// Every template is a complete action followed by a colon and a short,
+// word-bounded fragment of the user's own text (shortFragment). Splicing
+// the user's text mid-sentence would collide with its own grammar (a goal
+// such as "Work in small portions" after a verb such as "Make" reads as
+// "Make Work in small portions smaller"); a colon label stays intelligible
+// whatever the fragment's grammar. Each template is at most five words, so
+// with a five-word fragment an anchor stays within the 3-10 word limit.
+//
+// The pool has more entries than one request needs, so buildFallbackAnchors
+// can skip anchors already shown this session before repeating any —
+// bounded novelty for a couple of Regenerate clicks, reported honestly
+// through `repeatsPrevious` once the pool runs out.
+//
+// Built as one list per field, then interleaved (goal, struggle, why,
+// goal, ...), so a 3-anchor request touches goal, struggle and why once
+// each before using any field's second template.
+function fallbackAnchorPool(body: AnchorsRequest) {
+  const goal = shortFragment(body.intake.goal, 5);
+  const struggle = shortFragment(body.intake.struggle, 5);
+  const why = shortFragment(body.intake.goalWhy, 5);
 
-  const candidates = [
-    `Make ${goal} smaller`,
-    `Start ${goal} gently`,
-    `Write one small start`,
-    `Reduce ${struggle} first`,
-    `Read ${why} briefly`,
+  const byField = [
+    [
+      `Spend two minutes on: ${goal}`,
+      `Gather what you need for: ${goal}`,
+      `Do the easiest bit of: ${goal}`,
+      `Write one sentence about: ${goal}`,
+    ],
+    [`Start with one minute despite: ${struggle}`, `Note the hard part: ${struggle}`],
+    [`Read your reason once: ${why}`, `Say your reason out loud: ${why}`],
   ];
 
-  const anchors = sanitizeAndDedupeAnchors(candidates.map((text) => ({ text })));
+  const maxLength = Math.max(...byField.map((field) => field.length));
+  const interleaved: string[] = [];
 
-  return anchors.slice(0, count);
+  for (let i = 0; i < maxLength; i++) {
+    for (const field of byField) {
+      if (field[i]) {
+        interleaved.push(field[i]);
+      }
+    }
+  }
+
+  return interleaved;
+}
+
+export type FallbackAnchorSet = {
+  anchors: AnchorItem[];
+  // True when the pool had too few anchors not already shown this session,
+  // so some returned anchors repeat earlier ones. The UI tells the user
+  // instead of implying the set is new.
+  repeatsPrevious: boolean;
+};
+
+export function buildFallbackAnchors(
+  body: AnchorsRequest,
+  count: number,
+  excludeTexts: string[] = []
+): FallbackAnchorSet {
+  const sanitizedPool = sanitizeAndDedupeAnchors(
+    fallbackAnchorPool(body).map((text) => ({ text }))
+  );
+  const isNovel = (anchor: AnchorItem) =>
+    !excludeTexts.some((previous) => areNearDuplicateAnchors(anchor.text, previous));
+
+  const novel = sanitizedPool.filter(isNovel);
+
+  if (novel.length >= count) {
+    return { anchors: novel.slice(0, count), repeatsPrevious: false };
+  }
+
+  // Not enough unseen anchors left: use every unseen one first, then fill
+  // from the already-shown ones so the user still gets a full set, and
+  // report the repeat.
+  const repeated = sanitizedPool.filter((anchor) => !isNovel(anchor));
+
+  return {
+    anchors: [...novel, ...repeated].slice(0, count),
+    repeatsPrevious: true,
+  };
+}
+
+export function buildErrorAnchors(
+  body: AnchorsRequest,
+  count: number,
+  excludeTexts: string[] = []
+): AnchorItem[] {
+  return buildFallbackAnchors(body, count, excludeTexts).anchors;
 }

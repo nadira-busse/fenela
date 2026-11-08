@@ -97,11 +97,26 @@ Every response is therefore parsed and checked for:
 - exactly three anchors;
 - anchor length and quality;
 - relevance to the user's input;
+- three distinct actions rather than rewordings of one action;
 - safety.
 
 If the first response fails validation, Fenéla makes one constrained repair attempt.
 
 If the repaired response also fails, the app returns local deterministic suggestions instead of displaying invalid AI output.
+
+## Regenerate and variation
+
+During one intake session, Regenerate sends the suggestions already shown in that session (up to 15) with the request. The model is asked to offer different actions, and a deterministic word-overlap check flags suggestions that repeat or only reword earlier ones. A flagged response triggers the one repair attempt.
+
+If no clearly different set can be produced, Fenéla still shows a valid, safe set and tells the user that some suggestions are similar to ones already seen. It does not imply unlimited new suggestions.
+
+The overlap check is a heuristic, not language understanding. It catches near-identical wording but can miss two differently worded descriptions of the same action.
+
+## Fallback suggestions
+
+When AI is unavailable, disabled, rate limited or fails validation, Fenéla shows a small set of fixed, general starting points that quote a short part of the user's own answers. The screen labels them as general starting points, not personalized suggestions. The set supports two Regenerate rounds without repeats; after that, Fenéla says that suggestions repeat.
+
+Fallback suggestions cannot rephrase the user's text, so they are less specific than AI suggestions.
 
 ## Validation and tests
 
