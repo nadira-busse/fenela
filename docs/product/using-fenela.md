@@ -117,9 +117,9 @@ Exact installation and notification-setting menus differ between Android browser
 
 ## Email code sign-in
 
-Fenéla uses passwordless email sign-in with a 6-digit code.
+Fenéla uses passwordless email sign-in with an 8-digit code.
 
-Enter your email address on the sign-in screen, then enter the 6-digit code sent to that address to complete authentication. After a code is sent, requesting another one is disabled for a short period, to avoid sending repeated codes to the same address.
+Enter your email address on the sign-in screen, then enter the 8-digit code sent to that address to complete authentication. After a code is sent, requesting another one is disabled for a short period, to avoid sending repeated codes to the same address.
 
 The hosted deployment uses Supabase's built-in authentication email delivery. That service is rate-limited.
 

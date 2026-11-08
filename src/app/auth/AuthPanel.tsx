@@ -9,18 +9,24 @@ type Step = "email" | "code";
 type SendStatus = "idle" | "sending" | "sent" | "rate_limited" | "error";
 type VerifyStatus = "idle" | "verifying" | "invalid" | "rate_limited" | "error";
 
+// Email OTP length is configured per Supabase project: `otp_length` under
+// [auth.email] in supabase/config.toml locally, and the hosted project's
+// Auth settings in production. Both use 8 digits. This is the input's upper
+// bound rather than an exact length, so a code is never truncated; codes
+// shorter than the configured length are rejected by Supabase on verify.
+export const OTP_CODE_MAX_LENGTH = 8;
+
 type Props = {
   // Already validated server-side (safeRedirectPath) by src/app/auth/page.tsx
   // before reaching this component.
   next?: string;
 };
 
-// Still wired up even though this flow no longer expects the user to click
-// it: until the hosted Supabase email template is confirmed to show the
-// 6-digit code to every recipient, a stale template (or an email already
-// in flight when this shipped) may show only a link. Keeping this pointed
-// at the existing callback route means that link still works as a
-// fallback during rollout — see docs/technical/local-setup.md.
+// Sign-in is completed by entering the emailed code. The redirect still
+// points at the existing callback route so that any email containing a
+// sign-in link (for example, from a hosted template that still renders
+// {{ .ConfirmationURL }}, or an email already sent) completes sign-in
+// instead of failing — see docs/technical/local-setup.md.
 function callbackUrl(next: string) {
   const url = new URL("/auth/callback", window.location.origin);
   url.searchParams.set("next", next);
@@ -140,13 +146,13 @@ export function AuthPanel({ next = "/" }: Props) {
     return (
       <div className="flex flex-col">
         <p className="text-sm leading-relaxed text-[var(--text-soft)]">
-          We sent a 6-digit code to <span className="font-semibold">{email.trim()}</span>. Enter it
+          We sent a sign-in code to <span className="font-semibold">{email.trim()}</span>. Enter it
           below to sign in.
         </p>
 
         <form onSubmit={handleCodeSubmit} className="mt-6 flex flex-col">
           <label htmlFor="auth-otp-code" className="sr-only">
-            6-digit code
+            Sign-in code
           </label>
 
           <input
@@ -156,7 +162,7 @@ export function AuthPanel({ next = "/" }: Props) {
             inputMode="numeric"
             pattern="[0-9]*"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={OTP_CODE_MAX_LENGTH}
             required
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
@@ -232,7 +238,7 @@ export function AuthPanel({ next = "/" }: Props) {
   return (
     <div className="flex flex-col">
       <p className="text-sm leading-relaxed text-[var(--text-soft)]">
-        Enter your email and we’ll send you a 6-digit sign-in code.
+        Enter your email and we’ll send you a sign-in code.
       </p>
 
       <form onSubmit={handleEmailSubmit} className="mt-6 flex flex-col">

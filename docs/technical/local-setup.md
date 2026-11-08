@@ -139,7 +139,7 @@ The application can now connect to the local Supabase stack.
 
 ## 7. Test email code sign-in
 
-Fenéla uses passwordless email sign-in with a 6-digit code.
+Fenéla uses passwordless email sign-in with an 8-digit numeric code. The local Supabase stack issues 8-digit codes (`otp_length` under `[auth.email]` in `supabase/config.toml`), matching the hosted project. `AuthPanel.tsx` accepts codes up to 8 digits (`OTP_CODE_MAX_LENGTH`) and does not truncate them.
 
 Open:
 
@@ -157,31 +157,25 @@ npx supabase@2.113.0 status
 
 If that URL is not reachable and the local Supabase ports were adjusted, use the Mailpit host port published by Docker as described in the Supabase configuration section above.
 
-Open the working Mailpit URL and find the email. The local Supabase stack's default email template does not render the code as visible text — copy the `token` query parameter value out of the emailed link's URL instead (for example `http://127.0.0.1:54321/auth/v1/verify?token=123456&type=...`) and type it into Fenéla's 6-digit code field. It is the same value a hosted project's email template would show as `{{ .Token }}` once that template is updated (see "Required Supabase dashboard change for email code sign-in" below).
+Open the working Mailpit URL and find the email. Locally, sign-in email uses the template in `supabase/templates/local-otp.html` (configured as `[auth.email.template.magic_link]` in `supabase/config.toml`), which shows only the numeric code. Type that code into Fenéla's sign-in code field.
 
-Alternatively, the emailed link itself still works and returns through:
+After changing `supabase/config.toml` or the template, restart the local stack (`npx supabase@2.113.0 stop` and `npx supabase@2.113.0 start`) so Auth picks up the change.
 
-```text
-/auth/callback
-```
-
-The callback exchanges the authentication code for a Supabase session and returns the user to Fenéla. This is unchanged and is kept as a fallback during rollout; it is not the primary local test path above.
+The `/auth/callback` route remains in place. `AuthPanel.tsx` still passes it as `emailRedirectTo`, so an email that contains a sign-in link (for example, one sent from an older hosted template) still completes sign-in through the callback, which exchanges the authentication code for a Supabase session. It is not the primary sign-in path.
 
 After this step, the normal authenticated product flow can be used locally.
 
-### Required Supabase dashboard change for email code sign-in
+### Required hosted Supabase settings for email code sign-in
 
-This repository change only replaces the client-side UI and verification call (`signInWithOtp` followed by `verifyOtp`, instead of following a clicked link). It does not and cannot change the hosted Supabase project's email template — that is configured in the hosted Supabase dashboard, not in this repository, and is explicitly out of scope for this change.
+The hosted Supabase project's Auth settings and email templates are configured in the Supabase dashboard, not in this repository. Code sign-in requires:
 
-The hosted project's **Authentication → Email Templates → Magic Link** template must render `{{ .Token }}` (the 6-digit code) somewhere in its body for users to see a code to type. The default Supabase template only renders `{{ .ConfirmationURL }}` (a clickable link) and does not show the code.
+- **Authentication → Providers → Email → Email OTP length:** 8, matching the local configuration and `OTP_CODE_MAX_LENGTH`. A longer code would be truncated by the input field.
+- **Authentication → Email Templates → Magic Link:** renders `{{ .Token }}` so users can see the code to type. The default Supabase template only renders `{{ .ConfirmationURL }}` (a clickable link) and does not show the code.
+- **Authentication → Email Templates → Confirm signup:** if email confirmation is enabled on the hosted project, a first sign-in for a new address is sent with this template instead, so it must also render `{{ .Token }}`.
 
-Recommended rollout sequence, so neither a stale deployed client nor a template still mid-edit breaks sign-in:
+`{{ .ConfirmationURL }}` can be removed from these templates so the email contains only the code. Removing it from the email does not require any application change; the callback route stays available for links already sent.
 
-1. In the hosted dashboard, add `{{ .Token }}` to the Magic Link template body **alongside** the existing `{{ .ConfirmationURL }}` link (do not remove the link yet). This is additive: existing emails keep working as links for anyone still on old email or a cached old client, and newly sent emails now also show the code.
-2. Deploy this frontend change. New sign-ins show the 6-digit code UI; the email now contains both the code and a working fallback link (`AuthPanel.tsx` keeps `emailRedirectTo` wired to `/auth/callback` for exactly this reason).
-3. Only once satisfied that users are no longer relying on the link (for example, after a deploy cycle with no `/auth/callback` traffic), optionally remove `{{ .ConfirmationURL }}` from the template. This step is optional — leaving both in the template indefinitely is also safe.
-
-Until step 1 is done on the hosted project, hosted sign-in emails will still only show a link with no visible code, even though the deployed app already asks for one.
+Until the hosted templates render `{{ .Token }}`, hosted sign-in emails show only a link with no visible code, even though the deployed app asks for one. Update the templates before, or together with, deploying the code-entry UI.
 
 ## Optional features
 

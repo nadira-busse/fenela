@@ -54,6 +54,15 @@ describe("verifyOtpCode", () => {
     expect(verifyOtp).toHaveBeenCalledWith("user@example.com", "123456");
   });
 
+  it("forwards an 8-digit code to the provider unchanged (no truncation)", async () => {
+    const verifyOtp = vi.fn().mockResolvedValue({ error: null });
+
+    const result = await verifyOtpCode("user@example.com", "12345678", { verifyOtp });
+
+    expect(result).toEqual({ status: "verified" });
+    expect(verifyOtp).toHaveBeenCalledWith("user@example.com", "12345678");
+  });
+
   it("classifies otp_expired as invalid_or_expired (covers invalid, reused and expired codes)", async () => {
     const verifyOtp = vi.fn().mockResolvedValue({ error: { code: "otp_expired" } });
 

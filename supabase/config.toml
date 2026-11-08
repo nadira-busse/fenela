@@ -229,7 +229,7 @@ secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
-otp_length = 6
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
@@ -412,3 +412,10 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Local development sign-in email: shows only the numeric code, matching the
+# hosted project's email template, so local sign-in uses the same code-entry
+# flow as production.
+[auth.email.template.magic_link]
+subject = "Your Fenéla sign-in code"
+content_path = "./supabase/templates/local-otp.html"
